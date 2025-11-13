@@ -4,12 +4,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Camera, QrCode, CheckCircle, Clock, MapPin, AlertTriangle, ArrowLeft, Calendar as CalendarIcon } from "lucide-react";
+import { Camera, QrCode, CheckCircle, Clock, MapPin, AlertTriangle, ArrowLeft, Calendar as CalendarIcon, RotateCw } from "lucide-react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import ChecklistExecucao from "../components/mobile/ChecklistExecucao";
 import ScannerQR from "../components/mobile/ScannerQR";
 import { Layout } from "@/components/Layout";
+
+type CameraType = 'environment' | 'user';
 
 export default function TechMobile() {
 	const [etapa, setEtapa] = useState<'scanner'|'detalhes'|'checklist'|'finalizar'>('scanner');
@@ -19,11 +21,13 @@ export default function TechMobile() {
 	const [checklistAtual, setChecklistAtual] = useState<any | null>(null);
 	const [showCamera, setShowCamera] = useState(false);
 	const [user, setUser] = useState<any | null>(null);
+	const [cameraType, setCameraType] = useState<CameraType>('environment');
 	const videoRef = useRef<HTMLVideoElement | null>(null);
 	const streamRef = useRef<MediaStream | null>(null);
-	 const detectorRef = useRef<any | null>(null);
-	 const scanningRef = useRef<boolean>(false);
-	 const rafRef = useRef<number | null>(null);
+	const detectorRef = useRef<any | null>(null);
+	const scanningRef = useRef<boolean>(false);
+	const rafRef = useRef<number | null>(null);
+	const lastDetectionRef = useRef<{ code: string; time: number } | null>(null);
 
 	const queryClient = useQueryClient();
 
@@ -134,6 +138,12 @@ export default function TechMobile() {
 
 	const iniciarCamera = async () => {
 		try {
+			// Parar stream anterior se existir
+			if (streamRef.current) {
+				streamRef.current.getTracks().forEach(track => track.stop());
+				streamRef.current = null;
+			}
+
 			// Verificar se a API está disponível
 			if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
 				alert('Câmera não disponível neste navegador. Use HTTPS ou localhost.');
@@ -142,7 +152,7 @@ export default function TechMobile() {
 
 			const stream = await navigator.mediaDevices.getUserMedia({ 
 				video: { 
-					facingMode: 'environment',
+					facingMode: cameraType,
 					width: { ideal: 1280 },
 					height: { ideal: 720 }
 				}, 
@@ -152,12 +162,17 @@ export default function TechMobile() {
 			streamRef.current = stream;
 			setShowCamera(true);
 			
-			// Aguardar um pouco para garantir que o elemento video foi renderizado
+			// Aguardar renderização e atribuir stream
 			setTimeout(() => {
 				if (videoRef.current && streamRef.current) {
 					videoRef.current.srcObject = streamRef.current;
 					videoRef.current.play().catch(err => {
 						console.error('Erro ao reproduzir vídeo:', err);
+						setTimeout(() => {
+							if (videoRef.current && streamRef.current) {
+								videoRef.current.play().catch(console.error);
+							}
+						}, 200);
 					});
 				}
 			}, 100);
@@ -166,45 +181,54 @@ export default function TechMobile() {
 			try {
 				const track = stream.getVideoTracks()[0];
 				const settings: any = track.getSettings ? track.getSettings() : {};
-				const facing = settings.facingMode || 'environment';
+				const facing = settings.facingMode || cameraType;
 				if (videoRef.current) {
 					videoRef.current.style.transform = facing === 'user' ? 'scaleX(-1)' : 'none';
 				}
 			} catch (_) {}
 
-			// Inicializar BarcodeDetector se disponível
+			// Inicializar BarcodeDetector
 			if ((window as any).BarcodeDetector) {
 				try {
 					const formats = ['qr_code', 'ean_13', 'code_128', 'code_39', 'ean_8'];
 					detectorRef.current = new (window as any).BarcodeDetector({ formats });
+					
 					// iniciar loop de detecção
 					scanningRef.current = true;
 					rafRef.current = requestAnimationFrame(async function loop() {
 						if (!scanningRef.current) return;
 						try {
-							if (videoRef.current) {
+							if (videoRef.current && detectorRef.current) {
 								const results = await detectorRef.current.detect(videoRef.current);
 								if (results && results.length > 0) {
-									const raw = results[0].rawValue || (results[0].value && results[0].value.rawValue);
-									if (raw) {
-										// encontrar ativo
-										const codigo = raw.trim();
-										const ativo = (ativos as any[]).find(a =>
-											a.asset_code?.toLowerCase() === codigo.toLowerCase() ||
-											a.id === codigo ||
-											a.serial_number === codigo ||
-											a.qr_code === codigo
-										);
-										if (ativo) {
-											setAtivoAtual(ativo);
-											setEtapa('detalhes');
-											// parar camera
-											pararCamera();
-										} else {
-											// não encontrado, preenche o campo de busca para busca manual
-											setCodigoBusca(codigo);
-											// opcional: mostrar notificação
-											alert('Código lido, ativo não encontrado. Use busca manual.');
+									for (const r of results) {
+										const raw = r.rawValue || (r.value && r.value.rawValue) || r.value;
+										if (raw) {
+											const codigo = raw.toString().trim();
+											// Evitar detecção duplicada dentro de 500ms
+											const now = Date.now();
+											if (lastDetectionRef.current?.code === codigo && now - lastDetectionRef.current.time < 500) {
+												continue;
+											}
+											lastDetectionRef.current = { code: codigo, time: now };
+											
+											// encontrar ativo
+											const ativo = (ativos as any[]).find(a =>
+												a.asset_code?.toLowerCase() === codigo.toLowerCase() ||
+												a.id === codigo ||
+												a.serial_number === codigo ||
+												a.qr_code === codigo
+											);
+											if (ativo) {
+												setAtivoAtual(ativo);
+												setEtapa('detalhes');
+												// parar camera
+												pararCamera();
+											} else {
+												// não encontrado, preenche o campo de busca para busca manual
+												setCodigoBusca(codigo);
+												alert('Código lido, ativo não encontrado. Use busca manual.');
+											}
 										}
 									}
 								}
@@ -214,7 +238,8 @@ export default function TechMobile() {
 						}
 						rafRef.current = requestAnimationFrame(loop);
 					});
-				} catch (_) {
+				} catch (err) {
+					console.warn('BarcodeDetector não suportado:', err);
 					detectorRef.current = null;
 				}
 			} else {
@@ -232,11 +257,22 @@ export default function TechMobile() {
 			} else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
 				errorMsg = 'A câmera está sendo usada por outro aplicativo.';
 			} else if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
-				errorMsg = 'As configurações da câmera não são suportadas.';
+				errorMsg = 'As configurações da câmera não são suportadas. Tente outra câmera.';
 			}
 			
 			alert(errorMsg);
 		}
+	};
+
+	const alternarCamera = async () => {
+		const novaCamera: CameraType = cameraType === 'environment' ? 'user' : 'environment';
+		setCameraType(novaCamera);
+		console.log(`Alternando para câmera ${novaCamera === 'user' ? 'frontal' : 'traseira'}...`);
+		
+		// Reiniciar câmera com novo tipo
+		setTimeout(() => {
+			iniciarCamera();
+		}, 200);
 	};
 
 	const pararCamera = () => {
@@ -443,9 +479,15 @@ export default function TechMobile() {
 						</div>
 						<div className="p-6 bg-black">
 							<p className="text-white text-center mb-4">Posicione o QR Code no quadrado</p>
-							<Button onClick={pararCamera} variant="outline" className="w-full">
-								Fechar Câmera
-							</Button>
+							<div className="flex gap-3">
+								<Button onClick={alternarCamera} variant="outline" className="flex-1">
+									<RotateCw className="w-4 h-4 mr-2" />
+									Alternar ({cameraType === 'user' ? 'Frontal' : 'Traseira'})
+								</Button>
+								<Button onClick={pararCamera} variant="outline" className="flex-1">
+									Fechar Câmera
+								</Button>
+							</div>
 							<p className="text-xs text-center text-gray-400 mt-2">
 								Use a busca manual para continuar
 							</p>

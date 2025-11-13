@@ -3,7 +3,7 @@ import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ScanBarcode, QrCode, Search, X, CheckCircle, Download, ArrowLeft, History, Plus } from "lucide-react";
+import { ScanBarcode, QrCode, Search, X, CheckCircle, Download, ArrowLeft, History, Plus, Smartphone, RotateCw } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -13,6 +13,7 @@ import { ptBR } from "date-fns/locale";
 
 type InventoryStage = 'menu' | 'scanning' | 'history';
 type InventoryItem = { code: string; assetId?: string; asset_code?: string; asset_name?: string; location?: string; scannedAt: string };
+type CameraType = 'environment' | 'user';
 
 export default function Inventory() {
   const [stage, setStage] = useState<InventoryStage>('menu');
@@ -20,11 +21,13 @@ export default function Inventory() {
   const [showCamera, setShowCamera] = useState(false);
   const [readings, setReadings] = useState<InventoryItem[]>([]);
   const [currentInventoryId, setCurrentInventoryId] = useState<string | null>(null);
+  const [cameraType, setCameraType] = useState<CameraType>('environment');
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const detectorRef = useRef<any | null>(null);
   const scanningRef = useRef<boolean>(false);
   const rafRef = useRef<number | null>(null);
+  const lastDetectionRef = useRef<{ code: string; time: number } | null>(null);
 
   const { data: ativos = [] } = useQuery<any[], Error>({ 
     queryKey: ['ativos'], 
@@ -59,39 +62,77 @@ export default function Inventory() {
 
   const iniciarCamera = async () => {
     try {
+      // Parar stream anterior se existir
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' }, 
+        video: { 
+          facingMode: cameraType,
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }, 
         audio: false 
       });
       streamRef.current = stream;
-      if (videoRef.current) videoRef.current.srcObject = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play().catch(err => console.error('Erro ao reproduzir:', err));
+      }
       setShowCamera(true);
 
       // Ajustar espelhamento conforme câmera
       try {
         const track = stream.getVideoTracks()[0];
         const settings: any = track.getSettings ? track.getSettings() : {};
-        const facing = settings.facingMode || 'environment';
+        const facing = settings.facingMode || cameraType;
         if (videoRef.current) {
           videoRef.current.style.transform = facing === 'user' ? 'scaleX(-1)' : 'none';
         }
       } catch (_) {}
 
-      // Inicializar BarcodeDetector se disponível
+      // Inicializar BarcodeDetector
       if ((window as any).BarcodeDetector) {
         try {
           const formats = ['qr_code', 'ean_13', 'code_128', 'code_39', 'ean_8'];
           detectorRef.current = new (window as any).BarcodeDetector({ formats });
           startScanning();
-        } catch (_) {
+        } catch (err) {
+          console.warn('BarcodeDetector não suportado:', err);
           detectorRef.current = null;
+          toast.info('Detecção automática indisponível. Use busca manual.');
         }
       } else {
         detectorRef.current = null;
+        toast.info('BarcodeDetector não disponível. Use busca manual.');
       }
-    } catch (err) {
-      toast.error("Não foi possível acessar a câmera.");
+    } catch (err: any) {
+      console.error('Erro ao acessar câmera:', err);
+      let errorMsg = 'Não foi possível acessar a câmera.';
+      
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        errorMsg = 'Permissão de câmera negada. Por favor, permita o acesso.';
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        errorMsg = 'Nenhuma câmera encontrada no dispositivo.';
+      } else if (err.name === 'ConstraintNotSatisfiedError') {
+        errorMsg = 'As configurações da câmera não são suportadas. Tente outra câmera.';
+      }
+      
+      toast.error(errorMsg);
     }
+  };
+
+  const alternarCamera = async () => {
+    const novaCamera: CameraType = cameraType === 'environment' ? 'user' : 'environment';
+    setCameraType(novaCamera);
+    toast.info(`Alternando para câmera ${novaCamera === 'user' ? 'frontal' : 'traseira'}...`);
+    
+    // Reiniciar câmera com novo tipo
+    setTimeout(() => {
+      iniciarCamera();
+    }, 200);
   };
 
   const pararCamera = () => {
@@ -109,8 +150,17 @@ export default function Inventory() {
       const results = await detectorRef.current.detect(videoRef.current);
       if (results && results.length > 0) {
         for (const r of results) {
-          const raw = r.rawValue || (r.value && r.value.rawValue) || null;
-          if (raw) await onDetected(raw);
+          const raw = r.rawValue || (r.value && r.value.rawValue) || r.value || null;
+          if (raw) {
+            const code = raw.toString().trim();
+            // Evitar detecção duplicada dentro de 500ms
+            const now = Date.now();
+            if (lastDetectionRef.current?.code === code && now - lastDetectionRef.current.time < 500) {
+              continue;
+            }
+            lastDetectionRef.current = { code, time: now };
+            await onDetected(code);
+          }
         }
       }
     } catch (err) {
@@ -409,11 +459,16 @@ export default function Inventory() {
               ) : (
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle>Câmera Ativa</CardTitle>
-                    <Button variant="outline" size="sm" onClick={pararCamera}>
-                      <X className="h-4 w-4 mr-2" />
-                      Fechar
-                    </Button>
+                    <CardTitle>Câmera Ativa ({cameraType === 'user' ? 'Frontal' : 'Traseira'})</CardTitle>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={alternarCamera} title="Alternar câmera">
+                        <RotateCw className="h-4 w-4" />
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={pararCamera}>
+                        <X className="h-4 w-4 mr-2" />
+                        Fechar
+                      </Button>
+                    </div>
                   </CardHeader>
                   <CardContent>
                     <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
