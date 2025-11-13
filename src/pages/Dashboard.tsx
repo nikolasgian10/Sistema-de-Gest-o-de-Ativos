@@ -14,6 +14,7 @@ export default function Dashboard() {
   const [ordersCompleted, setOrdersCompleted] = useState<number>(0);
   const [totalCost, setTotalCost] = useState<number>(0);
   const [upcomingThisMonth, setUpcomingThisMonth] = useState<Array<{ date: string; asset_code: string }>>([]);
+  const [upcoming7Days, setUpcoming7Days] = useState<Array<{ date: string; asset_code: string; daysUntil: number; order_number?: string; status?: string }>>([]);
   const [overdues, setOverdues] = useState<Array<{ asset_code: string; days: number }>>([]);
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
 
@@ -42,27 +43,49 @@ export default function Dashboard() {
         .not("cost", "is", null);
       setTotalCost((costs || []).reduce((s, r: any) => s + (Number(r.cost) || 0), 0));
 
-      // Calendar (maintenance_schedule by selected month)
+      // Calendar (buscar manutenções reais das Ordens de Serviço por mês)
       const start = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
       const end = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
       const { data: sched } = await supabase
-        .from("maintenance_schedule")
-        .select("next_maintenance, assets(asset_code)")
-        .gte("next_maintenance", format(start, "yyyy-MM-dd"))
-        .lte("next_maintenance", format(end, "yyyy-MM-dd"))
-        .order("next_maintenance", { ascending: true });
+        .from("work_orders")
+        .select("scheduled_date, assets(asset_code), order_number, status")
+        .gte("scheduled_date", format(start, "yyyy-MM-dd"))
+        .lte("scheduled_date", format(end, "yyyy-MM-dd"))
+        .in("status", ["pendente", "em_andamento"])
+        .order("scheduled_date", { ascending: true });
       setUpcomingThisMonth(
-        (sched || []).map((s: any) => ({ date: s.next_maintenance, asset_code: s.assets?.asset_code }))
+        (sched || []).map((s: any) => ({ date: s.scheduled_date, asset_code: s.assets?.asset_code }))
+      );
+
+      // Próximas 7 dias (Alertas reais)
+      const today = new Date();
+      const sevenDaysLater = new Date(today);
+      sevenDaysLater.setDate(sevenDaysLater.getDate() + 7);
+      const { data: next7 } = await supabase
+        .from("work_orders")
+        .select("scheduled_date, assets(asset_code), order_number, status")
+        .in("status", ["pendente", "em_andamento"])
+        .gte("scheduled_date", format(today, "yyyy-MM-dd"))
+        .lte("scheduled_date", format(sevenDaysLater, "yyyy-MM-dd"))
+        .order("scheduled_date", { ascending: true });
+      setUpcoming7Days(
+        (next7 || []).map((s: any) => ({
+          date: s.scheduled_date,
+          asset_code: s.assets?.asset_code || "-",
+          order_number: s.order_number,
+          status: s.status,
+          daysUntil: Math.ceil((new Date(s.scheduled_date).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)),
+        }))
       );
 
       // Overdues (pending in the past)
       const { data: pend } = await supabase
         .from("work_orders")
-        .select("scheduled_date, assets(asset_code)")
-        .eq("status", "pendente");
+        .select("scheduled_date, assets(asset_code), status")
+        .in("status", ["pendente", "em_andamento"]);
       const now = new Date();
       const overdue = (pend || [])
-        .filter((p: any) => new Date(p.scheduled_date) < now)
+        .filter((p: any) => p.scheduled_date && new Date(p.scheduled_date) < now)
         .slice(0, 10)
         .map((p: any) => ({
           asset_code: p.assets?.asset_code || "-",
@@ -173,14 +196,19 @@ export default function Dashboard() {
             <CardContent>
               <div className="grid grid-cols-7 gap-2">
                 {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => {
-                  const label = upcomingThisMonth.find((u) => new Date(u.date).getDate() === day)?.asset_code;
+                  const entriesForDay = upcomingThisMonth.filter((u) => new Date(u.date).getDate() === day);
+                  const label = entriesForDay.length > 0 ? entriesForDay[0].asset_code : null;
+                  const moreCount = entriesForDay.length > 1 ? entriesForDay.length - 1 : 0;
                   return (
                     <div key={day} className="border rounded-lg h-12 flex flex-col items-center justify-center">
                       <span className="text-xs text-muted-foreground">{day}</span>
                       {label && (
-                        <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded mt-1 text-xs font-medium">
-                          {label}
-                        </span>
+                        <div className="flex items-center gap-1 mt-1">
+                          <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs font-medium">{label}</span>
+                          {moreCount > 0 && (
+                            <span className="text-xs text-slate-500">+{moreCount}</span>
+                          )}
+                        </div>
                       )}
                     </div>
                   );
@@ -206,10 +234,18 @@ export default function Dashboard() {
               </div>
               <div>
                 <div className="font-semibold text-orange-600 mb-2">Próximas 7 Dias</div>
-                <div className="flex justify-between text-sm">
-                  <span>AC-001</span>
-                  <span>0 dias</span>
-                </div>
+                {upcoming7Days.length === 0 ? (
+                  <div className="text-sm text-slate-500">Nenhuma manutenção prevista para os próximos 7 dias.</div>
+                ) : (
+                  <div className="space-y-2">
+                    {upcoming7Days.map((u, i) => (
+                      <div key={i} className="flex justify-between text-sm">
+                        <span className="truncate">{u.asset_code}{u.order_number ? ` • ${u.order_number}` : ''}</span>
+                        <span>{u.daysUntil <= 0 ? 'Hoje' : `${u.daysUntil} dia${u.daysUntil > 1 ? 's' : ''}`}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

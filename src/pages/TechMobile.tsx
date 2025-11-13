@@ -21,6 +21,9 @@ export default function TechMobile() {
 	const [user, setUser] = useState<any | null>(null);
 	const videoRef = useRef<HTMLVideoElement | null>(null);
 	const streamRef = useRef<MediaStream | null>(null);
+	 const detectorRef = useRef<any | null>(null);
+	 const scanningRef = useRef<boolean>(false);
+	 const rafRef = useRef<number | null>(null);
 
 	const queryClient = useQueryClient();
 
@@ -158,6 +161,66 @@ export default function TechMobile() {
 					});
 				}
 			}, 100);
+
+			// Ajustar espelhamento conforme câmera
+			try {
+				const track = stream.getVideoTracks()[0];
+				const settings: any = track.getSettings ? track.getSettings() : {};
+				const facing = settings.facingMode || 'environment';
+				if (videoRef.current) {
+					videoRef.current.style.transform = facing === 'user' ? 'scaleX(-1)' : 'none';
+				}
+			} catch (_) {}
+
+			// Inicializar BarcodeDetector se disponível
+			if ((window as any).BarcodeDetector) {
+				try {
+					const formats = ['qr_code', 'ean_13', 'code_128', 'code_39', 'ean_8'];
+					detectorRef.current = new (window as any).BarcodeDetector({ formats });
+					// iniciar loop de detecção
+					scanningRef.current = true;
+					rafRef.current = requestAnimationFrame(async function loop() {
+						if (!scanningRef.current) return;
+						try {
+							if (videoRef.current) {
+								const results = await detectorRef.current.detect(videoRef.current);
+								if (results && results.length > 0) {
+									const raw = results[0].rawValue || (results[0].value && results[0].value.rawValue);
+									if (raw) {
+										// encontrar ativo
+										const codigo = raw.trim();
+										const ativo = (ativos as any[]).find(a =>
+											a.asset_code?.toLowerCase() === codigo.toLowerCase() ||
+											a.id === codigo ||
+											a.serial_number === codigo ||
+											a.qr_code === codigo
+										);
+										if (ativo) {
+											setAtivoAtual(ativo);
+											setEtapa('detalhes');
+											// parar camera
+											pararCamera();
+										} else {
+											// não encontrado, preenche o campo de busca para busca manual
+											setCodigoBusca(codigo);
+											// opcional: mostrar notificação
+											alert('Código lido, ativo não encontrado. Use busca manual.');
+										}
+									}
+								}
+							}
+						} catch (err) {
+							// ignore
+						}
+						rafRef.current = requestAnimationFrame(loop);
+					});
+				} catch (_) {
+					detectorRef.current = null;
+				}
+			} else {
+				// BarcodeDetector não disponível no navegador
+				detectorRef.current = null;
+			}
 		} catch (err: any) {
 			console.error('Erro ao acessar câmera:', err);
 			let errorMsg = 'Não foi possível acessar a câmera.';
@@ -182,6 +245,12 @@ export default function TechMobile() {
 			streamRef.current = null;
 		}
 		setShowCamera(false);
+		// parar loop de detecção
+		scanningRef.current = false;
+		if (rafRef.current) {
+			cancelAnimationFrame(rafRef.current);
+			rafRef.current = null;
+		}
 	};
 
 	const obterChecklistDoAtivo = (ativo: any, tipoManutencao: string) => {
@@ -367,7 +436,6 @@ export default function TechMobile() {
 								playsInline 
 								muted 
 								className="w-full h-full object-cover"
-								style={{ transform: 'scaleX(-1)' }}
 							/>
 							<div className="absolute inset-0 flex items-center justify-center pointer-events-none">
 								<div className="w-64 h-64 border-4 border-white rounded-2xl shadow-lg"></div>

@@ -191,6 +191,84 @@ export type Database = {
           },
         ]
       }
+      inventories: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          total_items: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          total_items?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          total_items?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      inventory_items: {
+        Row: {
+          asset_code: string
+          asset_id: string | null
+          asset_name: string | null
+          created_at: string | null
+          id: string
+          inventory_id: string
+          location: string | null
+          scanned_at: string | null
+        }
+        Insert: {
+          asset_code: string
+          asset_id?: string | null
+          asset_name?: string | null
+          created_at?: string | null
+          id?: string
+          inventory_id: string
+          location?: string | null
+          scanned_at?: string | null
+        }
+        Update: {
+          asset_code?: string
+          asset_id?: string | null
+          asset_name?: string | null
+          created_at?: string | null
+          id?: string
+          inventory_id?: string
+          location?: string | null
+          scanned_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_items_inventory_id_fkey"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "inventories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_items_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string | null
