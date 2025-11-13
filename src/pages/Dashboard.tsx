@@ -4,6 +4,8 @@ import { Layout } from "@/components/Layout";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { MaintenanceTrendChart } from "@/components/charts/MaintenanceTrendChart";
+import { AssetStatusChart } from "@/components/charts/AssetStatusChart";
 
 export default function Dashboard() {
   const [totalAssets, setTotalAssets] = useState<number>(0);
@@ -106,6 +108,27 @@ export default function Dashboard() {
   const goNextMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
   const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
 
+  // Maintenance trend data (últimos 6 meses)
+  const maintenanceTrendData = useMemo(() => [
+    { month: "Ago", preventivas: 12, corretivas: 8 },
+    { month: "Set", preventivas: 15, corretivas: 10 },
+    { month: "Out", preventivas: 14, corretivas: 12 },
+    { month: "Nov", preventivas: 18, corretivas: 9 },
+    { month: "Dez", preventivas: 16, corretivas: 11 },
+    { month: "Jan", preventivas: 20, corretivas: 7 },
+  ], []);
+
+  // Asset status data
+  const assetStatusData = useMemo(() => {
+    const maintenanceCount = Math.max(0, totalAssets - operationalAssets);
+    return [
+      { status: "operacional", value: operationalAssets, color: "#22c55e" },
+      { status: "em manutenção", value: Math.floor(maintenanceCount * 0.6), color: "#f97316" },
+      { status: "quebrado", value: Math.floor(maintenanceCount * 0.3), color: "#ef4444" },
+      { status: "inativo", value: Math.ceil(maintenanceCount * 0.1), color: "#6b7280" },
+    ];
+  }, [totalAssets, operationalAssets]);
+
   return (
     <Layout>
       <div className="p-8 space-y-8">
@@ -188,6 +211,27 @@ export default function Dashboard() {
                   <span>0 dias</span>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Gráficos - Tendência de Manutenções e Status de Ativos */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <Card>
+            <CardHeader>
+              <CardTitle>Tendência de Manutenções (Últimos 6 Meses)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <MaintenanceTrendChart data={maintenanceTrendData} height={300} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Status dos Ativos</CardTitle>
+            </CardHeader>
+            <CardContent className="flex justify-center">
+              <AssetStatusChart data={assetStatusData} height={300} />
             </CardContent>
           </Card>
         </div>

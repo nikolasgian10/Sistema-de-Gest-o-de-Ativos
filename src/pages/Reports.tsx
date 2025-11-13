@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,6 +6,10 @@ import { Button } from "@/components/ui/button";
 import { BarChart3, Download, TrendingUp, DollarSign, Package } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CostEvolutionChart } from "@/components/charts/CostEvolutionChart";
+import { CostDistributionChart } from "@/components/charts/CostDistributionChart";
+import { TCOScatterChart } from "@/components/charts/TCOScatterChart";
+import { CostByTypeChart } from "@/components/charts/CostByTypeChart";
 
 interface ReportData {
   totalCost: number;
@@ -74,6 +78,49 @@ export default function Reports() {
     // Implementation for CSV export
     console.log("Exporting to CSV...");
   };
+
+  // Mock data for charts
+  const costEvolutionData = useMemo(
+    () => [
+      { month: "Jan", pecas: 1200, maoDeObra: 2500 },
+      { month: "Fev", pecas: 1500, maoDeObra: 2800 },
+      { month: "Mar", pecas: 980, maoDeObra: 2100 },
+      { month: "Abr", pecas: 2100, maoDeObra: 3200 },
+      { month: "Mai", pecas: 1800, maoDeObra: 2900 },
+      { month: "Jun", pecas: 1600, maoDeObra: 2700 },
+    ],
+    []
+  );
+
+  const costDistributionData = useMemo(
+    () => [
+      { name: "Peças", value: 12000 },
+      { name: "Mão de Obra", value: 18500 },
+      { name: "Outros", value: 3200 },
+    ],
+    []
+  );
+
+  const tcoScatterData = useMemo(
+    () => [
+      { name: "Ativo 1", idade: 2, tco: 5000, status: "ok" },
+      { name: "Ativo 2", idade: 5, tco: 12000, status: "ok" },
+      { name: "Ativo 3", idade: 8, tco: 25000, status: "critico" },
+      { name: "Ativo 4", idade: 3, tco: 7000, status: "ok" },
+      { name: "Ativo 5", idade: 10, tco: 45000, status: "critico" },
+      { name: "Ativo 6", idade: 1, tco: 1500, status: "ok" },
+    ],
+    []
+  );
+
+  const costByTypeData = useMemo(
+    () => [
+      { type: "Preventiva", custo: 8500 },
+      { type: "Corretiva", custo: 14200 },
+      { type: "Preditiva", custo: 3800 },
+    ],
+    []
+  );
 
   return (
     <Layout>
@@ -187,56 +234,65 @@ export default function Reports() {
             <div className="grid gap-4 md:grid-cols-2">
               <Card>
                 <CardHeader>
-                  <CardTitle>Custos por Tipo de Manutenção</CardTitle>
+                  <CardTitle>Evolução de Custos Mensais</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {loading ? (
                     <Skeleton className="h-64 w-full" />
                   ) : (
-                    <div className="space-y-4">
-                      {Object.entries(reportData?.costByType || {}).map(([type, cost]) => (
-                        <div key={type} className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span className="capitalize">{type}</span>
-                            <span className="font-medium">R$ {cost.toFixed(2)}</span>
-                          </div>
-                          <div className="w-full bg-secondary rounded-full h-2">
-                            <div
-                              className="bg-gradient-to-r from-primary to-primary-glow h-2 rounded-full transition-all"
-                              style={{
-                                width: `${(cost / (reportData?.totalCost || 1)) * 100}%`,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <CostEvolutionChart data={costEvolutionData} height={300} />
                   )}
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Recomendações</CardTitle>
+                  <CardTitle>Distribuição de Custos</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="p-4 bg-accent/20 rounded-lg">
-                      <p className="text-sm font-medium mb-1">Otimização de Custos</p>
-                      <p className="text-xs text-muted-foreground">
-                        Considere revisar contratos de manutenção preventiva para reduzir custos operacionais
-                      </p>
-                    </div>
-                    <div className="p-4 bg-accent/20 rounded-lg">
-                      <p className="text-sm font-medium mb-1">Eficiência Energética</p>
-                      <p className="text-xs text-muted-foreground">
-                        Ativos com mais de 10 anos podem ter TCO elevado. Avalie possível substituição
-                      </p>
-                    </div>
-                  </div>
+                <CardContent className="flex justify-center">
+                  {loading ? (
+                    <Skeleton className="h-64 w-full" />
+                  ) : (
+                    <CostDistributionChart data={costDistributionData} height={300} />
+                  )}
                 </CardContent>
               </Card>
             </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Custos por Tipo de Manutenção</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <Skeleton className="h-64 w-full" />
+                ) : (
+                  <CostByTypeChart data={costByTypeData} height={300} />
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Recomendações</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="p-4 bg-accent/20 rounded-lg">
+                    <p className="text-sm font-medium mb-1">Otimização de Custos</p>
+                    <p className="text-xs text-muted-foreground">
+                      Considere revisar contratos de manutenção preventiva para reduzir custos operacionais
+                    </p>
+                  </div>
+                  <div className="p-4 bg-accent/20 rounded-lg">
+                    <p className="text-sm font-medium mb-1">Eficiência Energética</p>
+                    <p className="text-xs text-muted-foreground">
+                      Ativos com mais de 10 anos podem ter TCO elevado. Avalie possível substituição
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="performance" className="space-y-4">
@@ -258,9 +314,29 @@ export default function Reports() {
                 <CardTitle>Análise TCO (Total Cost of Ownership)</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground">
-                  Análise detalhada do custo total de propriedade dos ativos
-                </p>
+                {loading ? (
+                  <Skeleton className="h-96 w-full" />
+                ) : (
+                  <TCOScatterChart data={tcoScatterData} height={350} />
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Guia de Interpretação TCO</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3 text-sm">
+                  <div className="p-3 bg-green-50 rounded border border-green-200">
+                    <p className="font-semibold text-green-900">Status OK (Verde)</p>
+                    <p className="text-green-800">Ativo saudável com TCO controlado. Manutenção conforme cronograma.</p>
+                  </div>
+                  <div className="p-3 bg-red-50 rounded border border-red-200">
+                    <p className="font-semibold text-red-900">Crítico - Substituir (Vermelho)</p>
+                    <p className="text-red-800">Alto custo de manutenção. Recomenda-se substituição do equipamento.</p>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

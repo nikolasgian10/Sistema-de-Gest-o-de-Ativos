@@ -47,6 +47,7 @@ const menuItems = [
   { title: "Planejamento Sistemático", url: "/planejamento", icon: Calendar },
   { title: "Inventário Rápido", url: "/inventario", icon: ScanBarcode },
   { title: "Relatórios Financeiros", url: "/relatorios", icon: BarChart3 },
+  { title: "Análise Visual", url: "/analise-visual", icon: BarChart3 },
   { title: "Desempenho Técnicos", url: "/desempenho", icon: Users },
   { title: "Técnico Mobile", url: "/tecnico-mobile", icon: Smartphone },
   { title: "Configurações", url: "/configuracoes", icon: Settings },
@@ -279,6 +280,26 @@ export function Sidebar() {
             </div>
           </div>
         )}
+        <div>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-red-50 text-red-600 font-medium transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                  {!isCollapsed && <span>Sair</span>}
+                </button>
+              </TooltipTrigger>
+              {isCollapsed && (
+                <TooltipContent side="right">
+                  <p>Sair</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
+        </div>
       </SidebarFooter>
     </SidebarUI>
   );
