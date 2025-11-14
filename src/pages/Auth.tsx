@@ -13,7 +13,7 @@ import { z } from "zod";
 const authSchema = z.object({
   email: z.string().email("Email inválido"),
   password: z.string().min(6, "A senha deve ter no mínimo 6 caracteres"),
-  fullName: z.string().min(3, "Nome deve ter no mínimo 3 caracteres").optional(),
+  fullName: z.string().min(1, "Nome não pode estar vazio").optional(),
 });
 
 export default function Auth() {

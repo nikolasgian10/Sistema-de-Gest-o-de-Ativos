@@ -10,6 +10,14 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 type InventoryStage = 'menu' | 'scanning' | 'history';
 type InventoryItem = { code: string; assetId?: string; asset_code?: string; asset_name?: string; location?: string; scannedAt: string };
@@ -22,6 +30,8 @@ export default function Inventory() {
   const [readings, setReadings] = useState<InventoryItem[]>([]);
   const [currentInventoryId, setCurrentInventoryId] = useState<string | null>(null);
   const [cameraType, setCameraType] = useState<CameraType>('environment');
+  const [confirmationOpen, setConfirmationOpen] = useState(false);
+  const [pendingItem, setPendingItem] = useState<InventoryItem | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const detectorRef = useRef<any | null>(null);
@@ -213,8 +223,35 @@ export default function Inventory() {
       location: ativo?.location,
       scannedAt: new Date().toISOString(),
     };
-    setReadings(prev => [newItem, ...prev]);
-    toast.success(ativo ? `✓ ${ativo.asset_code}` : 'Código lido (ativo não encontrado)');
+    
+    // Abrir diálogo de confirmação
+    setPendingItem(newItem);
+    setConfirmationOpen(true);
+    
+    // Parar scanning temporariamente para evitar leituras duplas
+    scanningRef.current = false;
+  };
+
+  const confirmAddItem = () => {
+    if (pendingItem) {
+      setReadings(prev => [pendingItem, ...prev]);
+      toast.success(pendingItem.asset_name ? `✓ ${pendingItem.asset_code}` : 'Código adicionado');
+    }
+    setConfirmationOpen(false);
+    setPendingItem(null);
+    // Retomar scanning
+    if (showCamera && detectorRef.current) {
+      scanningRef.current = true;
+    }
+  };
+
+  const cancelAddItem = () => {
+    setConfirmationOpen(false);
+    setPendingItem(null);
+    // Retomar scanning
+    if (showCamera && detectorRef.current) {
+      scanningRef.current = true;
+    }
   };
 
   const handleBuscar = () => {
@@ -621,5 +658,53 @@ export default function Inventory() {
     );
   }
 
-  return null;
+  // Diálogo de confirmação
+  return (
+    <>
+      <Dialog open={confirmationOpen} onOpenChange={setConfirmationOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirmar Leitura</DialogTitle>
+            <DialogDescription>
+              Deseja adicionar este ativo ao inventário?
+            </DialogDescription>
+          </DialogHeader>
+          
+          {pendingItem && (
+            <div className="space-y-4 py-4">
+              <div className="bg-slate-50 p-4 rounded-lg space-y-2">
+                <div>
+                  <p className="text-xs text-muted-foreground">Código</p>
+                  <p className="font-mono font-semibold">{pendingItem.asset_code || pendingItem.code}</p>
+                </div>
+                {pendingItem.asset_name && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Ativo</p>
+                    <p className="font-medium">{pendingItem.asset_name}</p>
+                  </div>
+                )}
+                {pendingItem.location && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Localização</p>
+                    <p className="text-sm">{pendingItem.location}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-3">
+            <Button variant="outline" onClick={cancelAddItem}>
+              Cancelar
+            </Button>
+            <Button onClick={confirmAddItem} className="bg-green-600 hover:bg-green-700">
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
 }
+
