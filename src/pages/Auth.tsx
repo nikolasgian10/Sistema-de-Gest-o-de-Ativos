@@ -13,7 +13,12 @@ import { z } from "zod";
 const authSchema = z.object({
   email: z.string().email("Email inválido"),
   password: z.string().min(6, "A senha deve ter no mínimo 6 caracteres"),
-  fullName: z.string().min(1, "Nome não pode estar vazio").optional(),
+});
+
+const signupSchema = z.object({
+  email: z.string().email("Email inválido"),
+  password: z.string().min(6, "A senha deve ter no mínimo 6 caracteres"),
+  fullName: z.string().min(1, "Nome não pode estar vazio"),
 });
 
 export default function Auth() {
@@ -50,7 +55,7 @@ export default function Auth() {
     setLoading(true);
 
     try {
-      authSchema.parse(formData);
+      authSchema.parse({ email: formData.email, password: formData.password });
 
       const { error } = await supabase.auth.signInWithPassword({
         email: formData.email,
@@ -81,12 +86,7 @@ export default function Auth() {
     setLoading(true);
 
     try {
-      authSchema.parse({ ...formData, fullName: formData.fullName });
-
-      if (!formData.fullName) {
-        toast.error("Por favor, preencha seu nome completo");
-        return;
-      }
+      signupSchema.parse({ email: formData.email, password: formData.password, fullName: formData.fullName });
 
       const { error } = await supabase.auth.signUp({
         email: formData.email,
