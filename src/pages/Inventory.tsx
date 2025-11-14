@@ -108,6 +108,45 @@ export default function Inventory() {
           setTimeout(() => resolve(), 1000);
         });
       }
+      // Se após o carregamento o vídeo continuar sem frames (alguns dispositivos ignoram facingMode), tentar fallback por deviceId
+      if (videoRef.current && (videoRef.current.readyState < 2 || videoRef.current.videoWidth === 0)) {
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const videoDevices = devices.filter(d => d.kind === 'videoinput');
+          if (videoDevices.length > 0) {
+            // Preferir câmera traseira se o label indicar isso
+            let chosen = videoDevices[0];
+            const rear = videoDevices.find(d => /back|rear|traseira|environment/i.test(d.label));
+            if (rear) chosen = rear;
+
+            // Tentar abrir stream usando deviceId exato
+            try {
+              const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: chosen.deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+              // parar stream anterior
+              if (streamRef.current) {
+                streamRef.current.getTracks().forEach(t => t.stop());
+              }
+              streamRef.current = fallbackStream;
+              if (videoRef.current) {
+                videoRef.current.srcObject = fallbackStream;
+                try { await videoRef.current.play(); } catch (e) { console.error('Erro play fallback:', e); }
+                // await loadeddata briefly
+                await new Promise<void>((resolve) => {
+                  if (!videoRef.current) return resolve();
+                  if (videoRef.current.readyState >= 2) return resolve();
+                  const onLoaded = () => { videoRef.current && videoRef.current.removeEventListener('loadeddata', onLoaded); resolve(); };
+                  videoRef.current.addEventListener('loadeddata', onLoaded);
+                  setTimeout(() => resolve(), 1000);
+                });
+              }
+            } catch (err) {
+              console.warn('Fallback por deviceId falhou:', err);
+            }
+          }
+        } catch (err) {
+          console.warn('Não foi possível enumerar dispositivos de mídia:', err);
+        }
+      }
       setShowCamera(true);
 
       // Ajustar espelhamento conforme câmera
