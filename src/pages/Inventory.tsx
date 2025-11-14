@@ -27,6 +27,8 @@ export default function Inventory() {
   const [stage, setStage] = useState<InventoryStage>('menu');
   const [scanInput, setScanInput] = useState("");
   const [showCamera, setShowCamera] = useState(false);
+  const [cameraInitializing, setCameraInitializing] = useState(false);
+  const [cameraSlow, setCameraSlow] = useState(false);
   const [readings, setReadings] = useState<InventoryItem[]>([]);
   const [currentInventoryId, setCurrentInventoryId] = useState<string | null>(null);
   const [cameraType, setCameraType] = useState<CameraType>('environment');
@@ -71,6 +73,10 @@ export default function Inventory() {
   });
 
   const iniciarCamera = async (cameraTypeOverride?: CameraType) => {
+    // Indicar que a câmera está iniciando (UX)
+    setCameraInitializing(true);
+    setCameraSlow(false);
+    let slowTimer: number | undefined = window.setTimeout(() => setCameraSlow(true), 2500);
     try {
       // Parar stream anterior se existir
       if (streamRef.current) {
@@ -184,6 +190,10 @@ export default function Inventory() {
       // garantir streamRef atual
       streamRef.current = openedStream;
       if (videoRef.current) videoRef.current.srcObject = openedStream;
+      // limpar indicador de inicialização
+      try { if (typeof slowTimer !== 'undefined') clearTimeout(slowTimer); } catch(_) {}
+      setCameraInitializing(false);
+      setCameraSlow(false);
       // Se após o carregamento o vídeo continuar sem frames, tentar fallback por deviceId
       if (videoRef.current && (videoRef.current.readyState < 2 || videoRef.current.videoWidth === 0)) {
         try {
@@ -268,6 +278,9 @@ export default function Inventory() {
         toast.info('BarcodeDetector não disponível. Use busca manual.');
       }
     } catch (err: any) {
+      try { if (typeof slowTimer !== 'undefined') clearTimeout(slowTimer); } catch (_) {}
+      setCameraInitializing(false);
+      setCameraSlow(false);
       console.error('Erro ao acessar câmera:', err);
       let errorMsg = 'Não foi possível acessar a câmera.';
       
@@ -297,6 +310,8 @@ export default function Inventory() {
       streamRef.current = null;
     }
     setShowCamera(false);
+    setCameraInitializing(false);
+    setCameraSlow(false);
     stopScanning();
   };
 
@@ -644,9 +659,9 @@ export default function Inventory() {
                   <CardContent className="flex flex-col items-center justify-center p-12 space-y-4">
                     <ScanBarcode className="h-16 w-16 text-muted-foreground" />
                     <p className="text-center text-sm text-muted-foreground">Clique abaixo para abrir a câmera</p>
-                    <Button onClick={() => iniciarCamera('environment')} className="w-full">
+                    <Button onClick={() => iniciarCamera('environment')} className="w-full" disabled={cameraInitializing}>
                       <ScanBarcode className="h-4 w-4 mr-2" />
-                      Abrir Câmera
+                      {cameraInitializing ? 'Abrindo câmera...' : 'Abrir Câmera'}
                     </Button>
                   </CardContent>
                 </Card>
@@ -670,6 +685,14 @@ export default function Inventory() {
                         muted
                         className="w-full h-full object-cover"
                       />
+                      {cameraInitializing && (
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white text-sm">
+                          <div className="text-center">
+                            <p>Iniciando câmera... Pode demorar alguns segundos.</p>
+                            {cameraSlow && <p className="text-xs text-muted-foreground mt-1">Se demorar, verifique permissões ou reinicie a câmera.</p>}
+                          </div>
+                        </div>
+                      )}
                       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                         <div className="w-48 h-48 border-4 border-green-500 rounded-lg"></div>
                       </div>
