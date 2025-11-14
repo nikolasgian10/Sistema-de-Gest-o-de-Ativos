@@ -670,6 +670,9 @@ export default function Inventory() {
                   <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle>Câmera Ativa ({cameraType === 'user' ? 'Frontal' : 'Traseira'})</CardTitle>
                     <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={alternarCamera} title="Alternar câmera">
+                        <RotateCw className="h-4 w-4" />
+                      </Button>
                       <Button variant="outline" size="sm" onClick={pararCamera}>
                         <X className="h-4 w-4 mr-2" />
                         Fechar
