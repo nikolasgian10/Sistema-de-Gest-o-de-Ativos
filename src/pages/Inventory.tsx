@@ -78,69 +78,162 @@ export default function Inventory() {
         streamRef.current = null;
       }
       const useCamera = cameraTypeOverride || cameraType;
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          facingMode: useCamera,
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        }, 
-        audio: false 
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        try {
-          await videoRef.current.play();
-        } catch (err) {
-          console.error('Erro ao reproduzir:', err);
+      // atualizar estado de cameraType para refletir a intenção
+      try { setCameraType(useCamera); } catch (_) {}
+
+      // Primeiro: tentar enumerar dispositivos e abrir explicitamente o deviceId da câmera traseira
+      let openedStream: MediaStream | null = null;
+      try {
+        let devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(d => d.kind === 'videoinput');
+
+        // Se labels vazias, solicitar permissão genérica para preencher labels
+        const labelsEmpty = videoDevices.length > 0 && videoDevices.every(d => !d.label);
+        if (labelsEmpty) {
+          try {
+            const temp = await navigator.mediaDevices.getUserMedia({ video: true });
+            temp.getTracks().forEach(t => t.stop());
+            devices = await navigator.mediaDevices.enumerateDevices();
+          } catch (err) {
+            console.warn('Permissão de câmera negada no prompt inicial:', err);
+          }
         }
 
-        // Esperar metadata/carregamento para evitar tela preta
-        await new Promise<void>((resolve) => {
-          if (!videoRef.current) return resolve();
-          if (videoRef.current.readyState >= 2) return resolve();
-          const onLoaded = () => {
-            videoRef.current && videoRef.current.removeEventListener('loadeddata', onLoaded);
-            resolve();
-          };
-          videoRef.current.addEventListener('loadeddata', onLoaded);
-          // fallback timeout
-          setTimeout(() => resolve(), 1000);
-        });
+        const videoDevices2 = devices.filter(d => d.kind === 'videoinput');
+        if (videoDevices2.length > 0) {
+          const preferred = videoDevices2.slice().sort((a, b) => {
+            const rearRe = /back|rear|traseira|environment/i;
+            const aRear = rearRe.test(a.label) ? 0 : 1;
+            const bRear = rearRe.test(b.label) ? 0 : 1;
+            return aRear - bRear;
+          });
+
+          for (const dev of preferred) {
+            try {
+              console.log('Tentando abrir deviceId', dev.deviceId, dev.label);
+              const s = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: dev.deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+              // testar rapidamente se entrega frames
+              streamRef.current = s;
+              if (videoRef.current) videoRef.current.srcObject = s;
+              try { videoRef.current && (await videoRef.current.play()); } catch (e) { console.warn('play erro no deviceId:', e); }
+              // aguardar loadeddata breve
+              await new Promise<void>((resolve) => {
+                if (!videoRef.current) return resolve();
+                if (videoRef.current.readyState >= 2 && videoRef.current.videoWidth > 0) return resolve();
+                const onLoaded = () => { videoRef.current && videoRef.current.removeEventListener('loadeddata', onLoaded); resolve(); };
+                videoRef.current.addEventListener('loadeddata', onLoaded);
+                setTimeout(() => resolve(), 1200);
+              });
+              if (videoRef.current && videoRef.current.videoWidth > 0) {
+                openedStream = s;
+                break;
+              }
+              // caso não tenha frames, parar e tentar próximo
+              s.getTracks().forEach(t => t.stop());
+              streamRef.current = null;
+            } catch (err) {
+              console.warn('Falha ao abrir deviceId', dev.deviceId, err);
+              continue;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Erro enumerando dispositivos:', err);
       }
-      // Se após o carregamento o vídeo continuar sem frames (alguns dispositivos ignoram facingMode), tentar fallback por deviceId
+
+      // Se não conseguiu abrir por deviceId, tenta usando facingMode como fallback
+      if (!openedStream) {
+        try {
+          const s2 = await navigator.mediaDevices.getUserMedia({ video: { facingMode: useCamera, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+          openedStream = s2;
+          streamRef.current = s2;
+          if (videoRef.current) {
+            videoRef.current.srcObject = s2;
+            try { await videoRef.current.play(); } catch (err) { console.error('Erro ao reproduzir fallback facingMode:', err); }
+            await new Promise<void>((resolve) => {
+              if (!videoRef.current) return resolve();
+              if (videoRef.current.readyState >= 2) return resolve();
+              const onLoaded = () => { videoRef.current && videoRef.current.removeEventListener('loadeddata', onLoaded); resolve(); };
+              videoRef.current.addEventListener('loadeddata', onLoaded);
+              setTimeout(() => resolve(), 1000);
+            });
+          }
+        } catch (err) {
+          console.error('Falha ao abrir câmera por facingMode como fallback:', err);
+        }
+      }
+
+      // Se mesmo assim não abriu, tentar um getUserMedia genérico como último recurso
+      if (!openedStream) {
+        try {
+          console.warn('Abrindo stream genérico como último recurso');
+          const generic = await navigator.mediaDevices.getUserMedia({ video: true });
+          openedStream = generic;
+          streamRef.current = generic;
+          if (videoRef.current) {
+            videoRef.current.srcObject = generic;
+            try { videoRef.current.muted = true; } catch (_) {}
+            try { await videoRef.current.play(); } catch (e) { console.warn('Erro play generic:', e); }
+          }
+        } catch (err) {
+          console.error('Falha ao abrir stream genérico:', err);
+          toast.error('Não foi possível iniciar a câmera. Verifique permissões e dispositivos.');
+          return;
+        }
+      }
+      // garantir streamRef atual
+      streamRef.current = openedStream;
+      if (videoRef.current) videoRef.current.srcObject = openedStream;
+      // Se após o carregamento o vídeo continuar sem frames, tentar fallback por deviceId
       if (videoRef.current && (videoRef.current.readyState < 2 || videoRef.current.videoWidth === 0)) {
         try {
           const devices = await navigator.mediaDevices.enumerateDevices();
           const videoDevices = devices.filter(d => d.kind === 'videoinput');
           if (videoDevices.length > 0) {
-            // Preferir câmera traseira se o label indicar isso
-            let chosen = videoDevices[0];
-            const rear = videoDevices.find(d => /back|rear|traseira|environment/i.test(d.label));
-            if (rear) chosen = rear;
+            // Ordenar preferindo câmeras traseiras quando possível
+            const preferred = videoDevices.slice().sort((a, b) => {
+              const rearRe = /back|rear|traseira|environment/i;
+              const aRear = rearRe.test(a.label) ? 0 : 1;
+              const bRear = rearRe.test(b.label) ? 0 : 1;
+              return aRear - bRear;
+            });
 
-            // Tentar abrir stream usando deviceId exato
-            try {
-              const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: chosen.deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
-              // parar stream anterior
-              if (streamRef.current) {
-                streamRef.current.getTracks().forEach(t => t.stop());
+            let success = false;
+            for (const dev of preferred) {
+              try {
+                const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: dev.deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+                // parar stream anterior
+                if (streamRef.current) {
+                  streamRef.current.getTracks().forEach(t => t.stop());
+                }
+                streamRef.current = fallbackStream;
+                if (videoRef.current) {
+                  videoRef.current.srcObject = fallbackStream;
+                  // garantir muted para permitir autoplay em alguns navegadores
+                  try { videoRef.current.muted = true; } catch (_) {}
+                  try { await videoRef.current.play(); } catch (e) { console.error('Erro play fallback:', e); }
+                  // aguardar carregamento
+                  await new Promise<void>((resolve) => {
+                    if (!videoRef.current) return resolve();
+                    if (videoRef.current.readyState >= 2 && videoRef.current.videoWidth > 0) return resolve();
+                    const onLoaded = () => { videoRef.current && videoRef.current.removeEventListener('loadeddata', onLoaded); resolve(); };
+                    videoRef.current.addEventListener('loadeddata', onLoaded);
+                    setTimeout(() => resolve(), 1200);
+                  });
+                  if (videoRef.current.videoWidth > 0) {
+                    success = true;
+                    break;
+                  }
+                }
+              } catch (err) {
+                // tentar próximo device
+                console.warn('Tentativa com deviceId falhou:', dev.deviceId, err);
+                continue;
               }
-              streamRef.current = fallbackStream;
-              if (videoRef.current) {
-                videoRef.current.srcObject = fallbackStream;
-                try { await videoRef.current.play(); } catch (e) { console.error('Erro play fallback:', e); }
-                // await loadeddata briefly
-                await new Promise<void>((resolve) => {
-                  if (!videoRef.current) return resolve();
-                  if (videoRef.current.readyState >= 2) return resolve();
-                  const onLoaded = () => { videoRef.current && videoRef.current.removeEventListener('loadeddata', onLoaded); resolve(); };
-                  videoRef.current.addEventListener('loadeddata', onLoaded);
-                  setTimeout(() => resolve(), 1000);
-                });
-              }
-            } catch (err) {
-              console.warn('Fallback por deviceId falhou:', err);
+            }
+
+            if (!success) {
+              toast.info('Não foi possível iniciar o preview da câmera. Tente alternar a câmera manualmente.');
             }
           }
         } catch (err) {
@@ -151,9 +244,9 @@ export default function Inventory() {
 
       // Ajustar espelhamento conforme câmera
       try {
-        const track = stream.getVideoTracks()[0];
-        const settings: any = track.getSettings ? track.getSettings() : {};
-        const facing = settings.facingMode || useCamera;
+        const track = streamRef.current?.getVideoTracks()[0];
+        const settings: any = track && track.getSettings ? track.getSettings() : {};
+        const facing = settings?.facingMode || useCamera;
         if (videoRef.current) {
           videoRef.current.style.transform = facing === 'user' ? 'scaleX(-1)' : 'none';
         }
@@ -551,7 +644,7 @@ export default function Inventory() {
                   <CardContent className="flex flex-col items-center justify-center p-12 space-y-4">
                     <ScanBarcode className="h-16 w-16 text-muted-foreground" />
                     <p className="text-center text-sm text-muted-foreground">Clique abaixo para abrir a câmera</p>
-                    <Button onClick={() => iniciarCamera()} className="w-full">
+                    <Button onClick={() => iniciarCamera('environment')} className="w-full">
                       <ScanBarcode className="h-4 w-4 mr-2" />
                       Abrir Câmera
                     </Button>
@@ -562,9 +655,6 @@ export default function Inventory() {
                   <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle>Câmera Ativa ({cameraType === 'user' ? 'Frontal' : 'Traseira'})</CardTitle>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={alternarCamera} title="Alternar câmera">
-                        <RotateCw className="h-4 w-4" />
-                      </Button>
                       <Button variant="outline" size="sm" onClick={pararCamera}>
                         <X className="h-4 w-4 mr-2" />
                         Fechar
