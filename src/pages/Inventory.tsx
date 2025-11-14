@@ -229,7 +229,7 @@ export default function Inventory() {
     setConfirmationOpen(true);
     
     // Parar scanning temporariamente para evitar leituras duplas
-    scanningRef.current = false;
+    stopScanning();
   };
 
   const confirmAddItem = () => {
@@ -239,18 +239,18 @@ export default function Inventory() {
     }
     setConfirmationOpen(false);
     setPendingItem(null);
-    // Retomar scanning
+    // Retomar scanning (usa startScanning para garantir requestAnimationFrame)
     if (showCamera && detectorRef.current) {
-      scanningRef.current = true;
+      startScanning();
     }
   };
 
   const cancelAddItem = () => {
     setConfirmationOpen(false);
     setPendingItem(null);
-    // Retomar scanning
+    // Retomar scanning (usa startScanning para garantir requestAnimationFrame)
     if (showCamera && detectorRef.current) {
-      scanningRef.current = true;
+      startScanning();
     }
   };
 
