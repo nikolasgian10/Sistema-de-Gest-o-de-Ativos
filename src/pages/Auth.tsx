@@ -32,20 +32,25 @@ export default function Auth() {
     role: "tecnico"
   });
 
+  // 🔥🔥 USE EFFECT SUBSTITUÍDO AQUI
   useEffect(() => {
+    // 1️⃣ Limpa tudo do navegador imediatamente
+    localStorage.clear();
+    sessionStorage.clear();
 
-    // 🔥🔥 LIMPA QUALQUER SESSÃO AUTOMATICAMENTE AO ABRIR A TELA
+    // 2️⃣ Limpa sessão do supabase
     supabase.auth.signOut({ scope: "global" });
 
-    // Verifica se ainda existe sessão (não deveria)
+    // 3️⃣ Se por algum milagre ainda tiver session, limpa de novo
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        // Se por algum milagre ainda existir, limpa novamente
         supabase.auth.signOut({ scope: "global" });
+        localStorage.clear();
+        sessionStorage.clear();
       }
     });
 
-    // Escuta mudança e redireciona caso logue
+    // 4️⃣ Se logar, manda para home
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session) {
         navigate("/");
@@ -54,6 +59,7 @@ export default function Auth() {
 
     return () => subscription.unsubscribe();
   }, [navigate]);
+  // 🔥🔥 FIM DO USE EFFECT
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
