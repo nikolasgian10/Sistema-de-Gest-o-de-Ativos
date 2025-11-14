@@ -348,7 +348,8 @@ export default function Inventory() {
     setCurrentInventoryId(data.id);
     setReadings([]);
     setStage('scanning');
-    await iniciarCamera();
+    // Forçar câmera traseira ao iniciar para evitar preview preto em alguns dispositivos
+    await iniciarCamera('environment');
   };
 
   const finalizarInventario = async () => {
