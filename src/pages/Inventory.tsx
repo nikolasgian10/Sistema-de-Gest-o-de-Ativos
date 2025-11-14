@@ -588,6 +588,51 @@ export default function Inventory() {
             </Button>
           </div>
         </div>
+
+        {/* Diálogo de confirmação */}
+        <Dialog open={confirmationOpen} onOpenChange={setConfirmationOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Confirmar Leitura</DialogTitle>
+              <DialogDescription>
+                Deseja adicionar este ativo ao inventário?
+              </DialogDescription>
+            </DialogHeader>
+            
+            {pendingItem && (
+              <div className="space-y-4 py-4">
+                <div className="bg-slate-50 p-4 rounded-lg space-y-2">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Código</p>
+                    <p className="font-mono font-semibold">{pendingItem.asset_code || pendingItem.code}</p>
+                  </div>
+                  {pendingItem.asset_name && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Ativo</p>
+                      <p className="font-medium">{pendingItem.asset_name}</p>
+                    </div>
+                  )}
+                  {pendingItem.location && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Localização</p>
+                      <p className="text-sm">{pendingItem.location}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <DialogFooter className="gap-3">
+              <Button variant="outline" onClick={cancelAddItem}>
+                Cancelar
+              </Button>
+              <Button onClick={confirmAddItem} className="bg-green-600 hover:bg-green-700">
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Confirmar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </Layout>
     );
   }
@@ -658,53 +703,6 @@ export default function Inventory() {
     );
   }
 
-  // Diálogo de confirmação
-  return (
-    <>
-      <Dialog open={confirmationOpen} onOpenChange={setConfirmationOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Confirmar Leitura</DialogTitle>
-            <DialogDescription>
-              Deseja adicionar este ativo ao inventário?
-            </DialogDescription>
-          </DialogHeader>
-          
-          {pendingItem && (
-            <div className="space-y-4 py-4">
-              <div className="bg-slate-50 p-4 rounded-lg space-y-2">
-                <div>
-                  <p className="text-xs text-muted-foreground">Código</p>
-                  <p className="font-mono font-semibold">{pendingItem.asset_code || pendingItem.code}</p>
-                </div>
-                {pendingItem.asset_name && (
-                  <div>
-                    <p className="text-xs text-muted-foreground">Ativo</p>
-                    <p className="font-medium">{pendingItem.asset_name}</p>
-                  </div>
-                )}
-                {pendingItem.location && (
-                  <div>
-                    <p className="text-xs text-muted-foreground">Localização</p>
-                    <p className="text-sm">{pendingItem.location}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          <DialogFooter className="gap-3">
-            <Button variant="outline" onClick={cancelAddItem}>
-              Cancelar
-            </Button>
-            <Button onClick={confirmAddItem} className="bg-green-600 hover:bg-green-700">
-              <CheckCircle className="h-4 w-4 mr-2" />
-              Confirmar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
-  );
+  return null;
 }
 

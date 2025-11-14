@@ -52,6 +52,52 @@ export default function WorkOrders() {
     fetchWorkOrders();
   }, []);
 
+  const handleExportarOrdens = async () => {
+    try {
+      const filteredOrders_ = workOrders.filter((order) => {
+        const matchesSearch =
+          order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          order.assets?.asset_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          order.description?.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesStatus = filterStatus === "all" || order.status === filterStatus;
+        const matchesType = filterType === "all" || order.order_type === filterType;
+        const matchesSector = sectorFilter === "all" || (order as any).assets?.location?.includes(sectorFilter) || (order as any).assets?.sector === sectorFilter;
+        return matchesSearch && matchesStatus && matchesType && matchesSector;
+      });
+
+      const headers = ['Número da OS', 'Ativo', 'Tipo', 'Prioridade', 'Status', 'Data Agendada', 'Local'];
+      const rows = filteredOrders_.map(order => [
+        order.order_number,
+        order.assets?.asset_code || 'N/A',
+        order.order_type === 'preventiva' ? 'Preventiva' : order.order_type === 'corretiva' ? 'Corretiva' : 'Instalação',
+        order.priority.charAt(0).toUpperCase() + order.priority.slice(1),
+        order.status.charAt(0).toUpperCase() + order.status.slice(1),
+        format(new Date(order.scheduled_date), 'dd/MM/yyyy', { locale: ptBR }),
+        order.assets?.location || 'N/A'
+      ]);
+
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `ordens_servico_${format(new Date(), 'yyyyMMdd_HHmmss')}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success('Ordens exportadas com sucesso!');
+    } catch (error) {
+      console.error('Erro ao exportar:', error);
+      toast.error('Erro ao exportar ordens');
+    }
+  };
+
   const fetchWorkOrders = async () => {
     try {
       const { data, error } = await supabase
@@ -213,7 +259,7 @@ export default function WorkOrders() {
               <Plus className="h-4 w-4 mr-2" />
               Nova OS
             </Button>
-            <Button variant="outline" onClick={fetchWorkOrders} className="gap-2">
+            <Button variant="outline" onClick={handleExportarOrdens} className="gap-2">
               <Download className="h-4 w-4" />
               Exportar
             </Button>
