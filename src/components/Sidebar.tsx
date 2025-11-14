@@ -16,6 +16,7 @@ import {
   User
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import {
   Sidebar as SidebarUI,
   SidebarContent,
@@ -57,6 +58,23 @@ export function Sidebar() {
   const { state } = useSidebar();
   const navigate = useNavigate();
   const isCollapsed = state === "collapsed";
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getUser();
+        const user = data?.user;
+        if (!user) return;
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+        if (mounted) setIsAdmin(profile?.role === "admin");
+      } catch (e) {
+        console.error("Error checking admin role:", e);
+      }
+    })();
+    return () => { mounted = false };
+  }, []);
 
   // Buscar alertas e pendências reais (igual ao Dashboard)
   const { data: alertsData, isLoading: isLoadingPending } = useQuery({
@@ -188,6 +206,35 @@ export function Sidebar() {
                   </TooltipProvider>
                 </SidebarMenuItem>
               ))}
+
+              {isAdmin && (
+                <SidebarMenuItem>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <SidebarMenuButton asChild>
+                          <NavLink
+                            to="/admin/users"
+                            className={({ isActive }) =>
+                              isActive
+                                ? "flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-50 text-blue-700 font-medium transition-all duration-200 mb-1 whitespace-normal"
+                                : "flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 text-slate-700 mb-1 whitespace-normal"
+                            }
+                          >
+                            <Users className="h-5 w-5 flex-shrink-0" />
+                            {!isCollapsed && <span className="font-medium whitespace-normal">Gerenciamento de Usuários</span>}
+                          </NavLink>
+                        </SidebarMenuButton>
+                      </TooltipTrigger>
+                      {isCollapsed && (
+                        <TooltipContent side="right">
+                          <p>Gerenciamento de Usuários</p>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
+                </SidebarMenuItem>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

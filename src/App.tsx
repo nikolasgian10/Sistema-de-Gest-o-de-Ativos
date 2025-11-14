@@ -16,6 +16,7 @@ import Inventory from "./pages/Inventory";
 import Reports from "./pages/Reports";
 import Performance from "./pages/Performance";
 import VisualAnalysis from "./pages/VisualAnalysis";
+import AdminUsers from "./pages/AdminUsers";
 import TechMobile from "./pages/TechMobile";
 import HistoricoAtivo from "./pages/HistoricoAtivo";
 import GestaoPecas from "./pages/GestaoPecas";
@@ -54,6 +55,57 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!session) {
     return <Navigate to="/auth" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
+      if (session?.user) {
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", session.user.id).single();
+        setIsAdmin(profile?.role === "admin");
+      }
+      setLoading(false);
+    })();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      setSession(session);
+      if (session?.user) {
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", session.user.id).single();
+        setIsAdmin(profile?.role === "admin");
+      } else {
+        setIsAdmin(false);
+      }
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  if (!isAdmin) {
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
@@ -121,6 +173,14 @@ const App = () => (
               <ProtectedRoute>
                 <VisualAnalysis />
               </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/users"
+            element={
+              <AdminRoute>
+                <AdminUsers />
+              </AdminRoute>
             }
           />
           <Route

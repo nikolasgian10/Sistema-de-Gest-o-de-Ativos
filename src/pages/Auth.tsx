@@ -88,14 +88,14 @@ export default function Auth() {
     try {
       signupSchema.parse({ email: formData.email, password: formData.password, fullName: formData.fullName });
 
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
           emailRedirectTo: `${window.location.origin}/`,
           data: {
             full_name: formData.fullName,
-            role: formData.role,
+            // do not set role here — admin will approve and assign
           },
         },
       });
@@ -109,7 +109,17 @@ export default function Auth() {
         return;
       }
 
-      toast.success("Cadastro realizado com sucesso!");
+      // If signup created a user object, create a profiles row with role null (pending approval)
+      try {
+        const createdUser = data?.user ?? (await supabase.auth.getUser()).data.user;
+        if (createdUser) {
+          await supabase.from("profiles").insert({ id: createdUser.id, full_name: formData.fullName, role: null });
+        }
+      } catch (err) {
+        console.error("Error creating profile record:", err);
+      }
+
+      toast.success("Cadastro realizado com sucesso! Aguarde aprovação do administrador.");
     } catch (error) {
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
