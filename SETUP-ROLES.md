@@ -47,8 +47,6 @@ Resultado esperado:
 
 ## PASSO 2: Criar tabelas no Supabase (2 min)
 
-## PASSO 2: Criar tabelas no Supabase (2 min)
-
 Copie TODO esse código e execute de uma vez no SQL Editor:
 
 ```sql

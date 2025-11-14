@@ -33,14 +33,19 @@ export default function Auth() {
   });
 
   useEffect(() => {
-    // Check if user is already logged in
+
+    // 🔥🔥 LIMPA QUALQUER SESSÃO AUTOMATICAMENTE AO ABRIR A TELA
+    supabase.auth.signOut({ scope: "global" });
+
+    // Verifica se ainda existe sessão (não deveria)
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        navigate("/");
+        // Se por algum milagre ainda existir, limpa novamente
+        supabase.auth.signOut({ scope: "global" });
       }
     });
 
-    // Listen for auth changes
+    // Escuta mudança e redireciona caso logue
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session) {
         navigate("/");
@@ -95,7 +100,6 @@ export default function Auth() {
           emailRedirectTo: `${window.location.origin}/`,
           data: {
             full_name: formData.fullName,
-            // do not set role here — admin will approve and assign
           },
         },
       });
@@ -109,17 +113,32 @@ export default function Auth() {
         return;
       }
 
-      // If signup created a user object, create a profiles row with role null (pending approval)
-      try {
-        const createdUser = data?.user ?? (await supabase.auth.getUser()).data.user;
-        if (createdUser) {
-          await supabase.from("profiles").insert({ id: createdUser.id, full_name: formData.fullName, role: null });
-        }
-      } catch (err) {
-        console.error("Error creating profile record:", err);
-      }
+      if (data?.user) {
+        try {
+          const { error: profileError } = await supabase
+            .from("profiles")
+            .insert({
+              id: data.user.id,
+              full_name: formData.fullName,
+              role: null,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            });
 
-      toast.success("Cadastro realizado com sucesso! Aguarde aprovação do administrador.");
+          if (profileError) {
+            console.error("Error creating profile:", profileError);
+            toast.error("Perfil criado mas com erro. Contate o administrador.");
+            return;
+          }
+
+          toast.success("Cadastro realizado com sucesso! Aguarde aprovação do administrador.");
+        } catch (err) {
+          console.error("Error creating profile record:", err);
+          toast.error("Erro ao criar perfil");
+        }
+      } else {
+        toast.error("Erro ao criar usuário");
+      }
     } catch (error) {
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);

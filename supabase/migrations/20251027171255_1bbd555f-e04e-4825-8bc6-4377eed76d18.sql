@@ -32,7 +32,7 @@ BEGIN
   VALUES (
     NEW.id,
     COALESCE(NEW.raw_user_meta_data->>'full_name', 'Usuário'),
-    COALESCE(NEW.raw_user_meta_data->>'role', 'tecnico')
+    NULL
   );
   RETURN NEW;
 END;
