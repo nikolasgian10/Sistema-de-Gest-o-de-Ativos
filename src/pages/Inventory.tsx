@@ -70,17 +70,17 @@ export default function Inventory() {
     }
   });
 
-  const iniciarCamera = async () => {
+  const iniciarCamera = async (cameraTypeOverride?: CameraType) => {
     try {
       // Parar stream anterior se existir
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
         streamRef.current = null;
       }
-
+      const useCamera = cameraTypeOverride || cameraType;
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
-          facingMode: cameraType,
+          facingMode: useCamera,
           width: { ideal: 1280 },
           height: { ideal: 720 }
         }, 
@@ -89,7 +89,24 @@ export default function Inventory() {
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play().catch(err => console.error('Erro ao reproduzir:', err));
+        try {
+          await videoRef.current.play();
+        } catch (err) {
+          console.error('Erro ao reproduzir:', err);
+        }
+
+        // Esperar metadata/carregamento para evitar tela preta
+        await new Promise<void>((resolve) => {
+          if (!videoRef.current) return resolve();
+          if (videoRef.current.readyState >= 2) return resolve();
+          const onLoaded = () => {
+            videoRef.current && videoRef.current.removeEventListener('loadeddata', onLoaded);
+            resolve();
+          };
+          videoRef.current.addEventListener('loadeddata', onLoaded);
+          // fallback timeout
+          setTimeout(() => resolve(), 1000);
+        });
       }
       setShowCamera(true);
 
@@ -97,7 +114,7 @@ export default function Inventory() {
       try {
         const track = stream.getVideoTracks()[0];
         const settings: any = track.getSettings ? track.getSettings() : {};
-        const facing = settings.facingMode || cameraType;
+        const facing = settings.facingMode || useCamera;
         if (videoRef.current) {
           videoRef.current.style.transform = facing === 'user' ? 'scaleX(-1)' : 'none';
         }
@@ -138,11 +155,8 @@ export default function Inventory() {
     const novaCamera: CameraType = cameraType === 'environment' ? 'user' : 'environment';
     setCameraType(novaCamera);
     toast.info(`Alternando para câmera ${novaCamera === 'user' ? 'frontal' : 'traseira'}...`);
-    
-    // Reiniciar câmera com novo tipo
-    setTimeout(() => {
-      iniciarCamera();
-    }, 200);
+    // Reiniciar câmera com novo tipo (passa override para evitar dependência do state async)
+    await iniciarCamera(novaCamera);
   };
 
   const pararCamera = () => {
@@ -309,19 +323,23 @@ export default function Inventory() {
       return;
     }
 
-    // Salvar leituras em inventory_items
-    const items = readings.map(r => ({
-      inventory_id: currentInventoryId,
-      asset_id: r.assetId || null,
-      asset_code: r.asset_code || r.code,
-      asset_name: r.asset_name,
-      location: r.location,
-      scanned_at: r.scannedAt,
-    }));
+    // Enriquecer leituras com dados do ativo (se disponíveis) antes de salvar
+    const enriched = readings.map(r => {
+      const code = (r.asset_code || r.code || '').toString();
+      const match = (ativos as any[]).find(a => a.asset_code?.toLowerCase() === code.toLowerCase() || a.id === r.assetId);
+      return {
+        inventory_id: currentInventoryId,
+        asset_id: r.assetId || match?.id || null,
+        asset_code: (r.asset_code || match?.asset_code || r.code || '').toString(),
+        asset_name: r.asset_name || match?.name || match?.asset_type || null,
+        location: r.location || match?.location || null,
+        scanned_at: r.scannedAt,
+      };
+    });
 
     const { error: insertError } = await supabase
       .from('inventory_items')
-      .insert(items as any[]);
+      .insert(enriched as any[]);
 
     if (insertError) {
       toast.error('Erro ao salvar itens do inventário');
@@ -343,8 +361,14 @@ export default function Inventory() {
       return;
     }
 
-    // Gerar e fazer download do CSV
-    generateAndDownloadCSV(readings);
+    // Gerar e fazer download do CSV (usar dados enriquecidos)
+    generateAndDownloadCSV(enriched.map(e => ({
+      code: e.asset_code,
+      asset_code: e.asset_code,
+      asset_name: e.asset_name || undefined,
+      location: e.location || undefined,
+      scannedAt: e.scanned_at,
+    })));
 
     toast.success('Inventário finalizado com sucesso!');
     pararCamera();
@@ -487,7 +511,7 @@ export default function Inventory() {
                   <CardContent className="flex flex-col items-center justify-center p-12 space-y-4">
                     <ScanBarcode className="h-16 w-16 text-muted-foreground" />
                     <p className="text-center text-sm text-muted-foreground">Clique abaixo para abrir a câmera</p>
-                    <Button onClick={iniciarCamera} className="w-full">
+                    <Button onClick={() => iniciarCamera()} className="w-full">
                       <ScanBarcode className="h-4 w-4 mr-2" />
                       Abrir Câmera
                     </Button>
