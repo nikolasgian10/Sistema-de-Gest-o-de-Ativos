@@ -16,7 +16,6 @@ import Inventory from "./pages/Inventory";
 import Reports from "./pages/Reports";
 import Performance from "./pages/Performance";
 import VisualAnalysis from "./pages/VisualAnalysis";
-import AdminUsers from "./pages/AdminUsers";
 import TechMobile from "./pages/TechMobile";
 import HistoricoAtivo from "./pages/HistoricoAtivo";
 import GestaoPecas from "./pages/GestaoPecas";
@@ -206,16 +205,6 @@ const App = () => (
               <ProtectedRoute>
                 <RoleRoute requiredRoles={["admin"]}>
                   <Settings />
-                </RoleRoute>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/users"
-            element={
-              <ProtectedRoute>
-                <RoleRoute requiredRoles={["admin"]}>
-                  <AdminUsers />
                 </RoleRoute>
               </ProtectedRoute>
             }

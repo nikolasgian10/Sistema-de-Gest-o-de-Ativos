@@ -209,43 +209,7 @@ export function Sidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {role === "admin" && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 py-2">
-              Administração
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <SidebarMenuButton asChild>
-                          <NavLink
-                            to="/admin/users"
-                            className={({ isActive }) =>
-                              isActive
-                                ? "flex items-center gap-3 px-4 py-3 rounded-xl bg-red-50 text-red-700 font-medium transition-all duration-200 mb-1 whitespace-normal"
-                                : "flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-50 hover:text-red-700 transition-all duration-200 text-slate-700 mb-1 whitespace-normal"
-                            }
-                          >
-                            <Users className="h-5 w-5 flex-shrink-0" />
-                            {!isCollapsed && <span className="font-medium whitespace-normal">Gerenciamento de Usuários</span>}
-                          </NavLink>
-                        </SidebarMenuButton>
-                      </TooltipTrigger>
-                      {isCollapsed && (
-                        <TooltipContent side="right">
-                          <p>Gerenciamento de Usuários</p>
-                        </TooltipContent>
-                      )}
-                    </Tooltip>
-                  </TooltipProvider>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
+
 
         {!isCollapsed && (
           <SidebarGroup>
