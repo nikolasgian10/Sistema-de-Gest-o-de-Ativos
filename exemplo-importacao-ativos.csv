@@ -1,0 +1,10 @@
+AC-001;ar_condicionado;LG;Split 12.000 BTU;Sala 101;Administração;operacional
+AC-002;ar_condicionado;Samsung;Split 18.000 BTU;Sala 102;TI;operacional
+AC-003;ar_condicionado;Daikin;Split 24.000 BTU;Sala 103;Produção;operacional
+AC-004;ar_condicionado;Consul;Split 9.000 BTU;Sala 104;Recepção;operacional
+AC-005;ar_condicionado;LG;Split 12.000 BTU;Sala 105;Vendas;operacional
+MC-001;mecalor;York;Chiller 50TR;Sala 201;Produção;operacional
+MC-002;mecalor;Carrier;Chiller 100TR;Sala 202;Produção;operacional
+AM-001;ar_maquina;Trane;RTU 30TR;Sala 301;Administração;operacional
+AM-002;ar_maquina;Lennox;RTU 60TR;Sala 302;Produção;operacional
+
