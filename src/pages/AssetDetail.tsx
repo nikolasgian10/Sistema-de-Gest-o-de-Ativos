@@ -65,6 +65,9 @@ interface Asset {
   purchase_cost: number | null;
   technical_specs: string | null;
   notes: string | null;
+  bem_matrimonial?: string | null;
+  sigla_local?: string | null;
+  altura_option?: string | null;
   created_at: string;
   updated_at: string | null;
 }
@@ -116,9 +119,16 @@ export default function AssetDetail() {
 
     try {
       setIsSubmitting(true);
+      const updateData: any = {
+        ...formData,
+        sigla_local: formData.sigla_local?.trim?.() || null,
+        bem_matrimonial: formData.bem_matrimonial && formData.bem_matrimonial !== 'none' ? formData.bem_matrimonial : null,
+        altura_option: formData.altura_option && formData.altura_option !== 'none' ? formData.altura_option : null,
+      };
+
       const { error } = await supabase
         .from("assets")
-        .update(formData)
+        .update(updateData)
         .eq("id", asset.id);
 
       if (error) throw error;
@@ -313,6 +323,12 @@ export default function AssetDetail() {
                 <p className="text-sm text-muted-foreground">Localização</p>
                 <p className="font-medium">{asset.location}</p>
               </div>
+              {asset.sigla_local && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Sigla do Local</p>
+                  <p className="font-medium">{asset.sigla_local}</p>
+                </div>
+              )}
               {asset.sector && (
                 <div>
                   <p className="text-sm text-muted-foreground">Setor</p>
@@ -349,6 +365,12 @@ export default function AssetDetail() {
                 <div>
                   <p className="text-sm text-muted-foreground">Capacidade</p>
                   <p className="font-medium">{asset.capacity}</p>
+                </div>
+              )}
+              {asset.altura_option && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Altura</p>
+                  <p className="font-medium">{asset.altura_option}</p>
                 </div>
               )}
             </CardContent>
@@ -406,6 +428,12 @@ export default function AssetDetail() {
                       maximumFractionDigits: 2,
                     })}
                   </p>
+                </div>
+              )}
+              {asset.bem_matrimonial && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Bem Matrimonial</p>
+                  <p className="font-medium">{asset.bem_matrimonial}</p>
                 </div>
               )}
               {asset.technical_specs && (

@@ -23,6 +23,29 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 
+// Gera um código de ativo seguindo a regra solicitada.
+function generateAssetCode(assetType: string | undefined, sigla_local?: string | null, sector?: string | null, altura_option?: string | null) {
+  const map: Record<string, string> = {
+    ar_condicionado: 'AC',
+    chiller: 'CHI',
+    split: 'SPT',
+    mecalor: 'MEC',
+    ar_maquina: 'AMQ',
+    outro: 'OUT',
+  };
+
+  const prefix = map[assetType || ''] || 'OUT';
+
+  // Número aleatório de 6 dígitos (ex: 910443). Pode ser substituído por sequência única do servidor.
+  const randomNum = Math.floor(100000 + Math.random() * 900000).toString();
+
+  const sig = sigla_local ? String(sigla_local).toUpperCase().replace(/\s+/g, '-') : 'NO-SIG';
+  const sec = sector ? String(sector).toUpperCase().replace(/\s+/g, '-') : 'NO-SETOR';
+  const alt = altura_option ? String(altura_option).toUpperCase() : '';
+
+  return `${prefix}-${randomNum}-${sig}-${sec}${alt ? '-' + alt : ''}`;
+}
+
 interface Asset {
   id: string;
   asset_code: string;
@@ -32,6 +55,9 @@ interface Asset {
   location: string;
   operational_status: string;
   qr_code?: string | null;
+  sigla_local?: string | null;
+  bem_matrimonial?: string | null;
+  altura_option?: string | null;
 }
 
 const statusColors: Record<string, string> = {
@@ -196,6 +222,9 @@ export default function Assets() {
                       serial_number: data.serial_number?.trim() || null,
                       location: data.location?.trim(),
                       sector: data.sector?.trim() || null,
+                      sigla_local: data.sigla_local?.trim() || null,
+                      bem_matrimonial: data.bem_matrimonial?.trim() || null,
+                      altura_option: data.altura_option && data.altura_option !== 'none' ? data.altura_option : null,
                       capacity: data.capacity?.trim() || null,
                       operational_status: data.operational_status || 'operacional',
                       notes: data.notes?.trim() || null,
@@ -211,9 +240,9 @@ export default function Assets() {
                       assetData.operational_status = 'operacional'; // Default
                     }
 
-                    // Validar campos obrigatórios
+                    // Gerar código automaticamente se não fornecido
                     if (!assetData.asset_code) {
-                      throw new Error('Código do ativo é obrigatório');
+                      assetData.asset_code = generateAssetCode(assetType, assetData.sigla_local, assetData.sector, assetData.altura_option);
                     }
                     if (!assetData.location) {
                       throw new Error('Localização é obrigatória');
@@ -416,17 +445,17 @@ export default function Assets() {
               <DialogDescription className="space-y-2">
                 <div>Cole os dados dos ativos no formato CSV. Um ativo por linha.</div>
                 <div>
-                  <strong>Formato:</strong> Código;Tipo;Marca;Modelo;Localização;Setor;Status
+                  <strong>Formato:</strong> Código;Tipo;Marca;Modelo;Localização;Setor;Sigla;BemMatrimonial;Altura;Status
                 </div>
                 <div>
                   <strong>Obrigatórios:</strong> Código, Tipo, Localização
                   <br />
-                  <strong>Opcionais:</strong> Marca, Modelo, Setor, Status (deixe vazio se não tiver)
+                  <strong>Opcionais:</strong> Marca, Modelo, Setor, Sigla, BemMatrimonial, Altura (A/B), Status
                 </div>
                 <div>
-                  <strong>Exemplo completo:</strong> AC-001;ar_condicionado;LG;Split 12k;Sala 101;Administração;operacional
+                  <strong>Exemplo completo:</strong> AC-001;ar_condicionado;LG;Split 12k;Sala 101;Administração;SL-01;BM-123;A;operacional
                   <br />
-                  <strong>Exemplo mínimo:</strong> AC-001;ar_condicionado;;;Sala 101;;
+                  <strong>Exemplo mínimo:</strong> AC-001;ar_condicionado;;;Sala 101;;;;
                 </div>
                 <div>
                   <strong>Tipos válidos:</strong> ar_condicionado, mecalor, ar_maquina
@@ -444,7 +473,7 @@ export default function Assets() {
                 <Label htmlFor="import-data">Dados dos Ativos (CSV)</Label>
                 <Textarea
                   id="import-data"
-                  placeholder="AC-001;ar_condicionado;LG;Split 12k;Sala 101;Administração;operacional&#10;AC-002;mecalor;York;Chiller 50TR;Sala 102;TI;operacional"
+                  placeholder="AC-001;ar_condicionado;LG;Split 12k;Sala 101;Administração;SL-01;BM-123;A;operacional&#10;AC-002;mecalor;York;Chiller 50TR;Sala 102;TI;;;operacional"
                   className="min-h-[300px] font-mono text-sm"
                 />
               </div>
@@ -494,17 +523,22 @@ export default function Assets() {
                       try {
                         // Tentar parsear como CSV (separado por ; ou ,)
                         const parts = line.split(/[;,]/).map(p => p.trim());
-                        
-                        if (parts.length < 4) {
-                          errors.push(`Linha ${i + 1}: Formato inválido (mínimo 4 campos: código, tipo, marca, localização)`);
-                          continue;
-                        }
 
-                        const [asset_code, asset_type, brand, model, location, sector, operational_status] = parts;
+                        // Mapear posições (compatível com formato antigo)
+                        const asset_code = parts[0];
+                        const asset_type = parts[1];
+                        const brand = parts[2] || '';
+                        const model = parts[3] || '';
+                        const location = parts[4] || '';
+                        const sector = parts[5] || '';
+                        const sigla_local = parts[6] || '';
+                        const bem_matrimonial = parts[7] || '';
+                        const altura_option = parts[8] || '';
+                        const operational_status = parts[9] || '';
 
-                        // Validar campos obrigatórios
-                        if (!asset_code || !asset_type || !location) {
-                          errors.push(`Linha ${i + 1}: Campos obrigatórios faltando (código, tipo, localização)`);
+                        // Validar campos obrigatórios (tipo e localização são obrigatórios)
+                        if (!asset_type || !location) {
+                          errors.push(`Linha ${i + 1}: Campos obrigatórios faltando (tipo, localização)`);
                           continue;
                         }
 
@@ -518,6 +552,9 @@ export default function Assets() {
                           validAssetType = 'ar_condicionado';
                         }
 
+                        // Gerar código se não informado (usar validAssetType)
+                        const finalAssetCode = asset_code && asset_code.trim() ? asset_code.trim() : generateAssetCode(validAssetType, sigla_local, sector, altura_option);
+
                         // Validar status
                         const validStatuses = ['operacional', 'manutencao', 'quebrado', 'desativado'];
                         let validStatus = (operational_status || 'operacional').toLowerCase();
@@ -527,12 +564,15 @@ export default function Assets() {
                         }
 
                         assetsToInsert.push({
-                          asset_code: asset_code.trim(),
+                          asset_code: finalAssetCode,
                           asset_type: validAssetType,
                           brand: brand?.trim() || null,
                           model: model?.trim() || null,
                           location: location.trim(),
                           sector: sector?.trim() || null,
+                          sigla_local: sigla_local?.trim() || null,
+                          bem_matrimonial: bem_matrimonial?.trim() || null,
+                          altura_option: altura_option && altura_option !== 'none' ? altura_option : null,
                           operational_status: validStatus,
                           created_by: profile?.id || null,
                         });

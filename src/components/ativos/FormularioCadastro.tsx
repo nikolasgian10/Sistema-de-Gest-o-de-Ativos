@@ -39,6 +39,9 @@ export default function FormularioCadastro({
     purchase_cost: initialData?.purchase_cost || "",
     technical_specs: initialData?.technical_specs || "",
     notes: initialData?.notes || "",
+    bem_matrimonial: initialData?.bem_matrimonial || "",
+    sigla_local: initialData?.sigla_local || "",
+    altura_option: initialData?.altura_option || "",
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -135,6 +138,16 @@ export default function FormularioCadastro({
         </div>
 
         <div>
+          <Label htmlFor="sigla_local">Sigla do Local</Label>
+          <Input
+            id="sigla_local"
+            value={formData.sigla_local}
+            onChange={(e) => setFormData({ ...formData, sigla_local: e.target.value })}
+            placeholder="Ex: SL-01"
+          />
+        </div>
+
+        <div>
           <Label htmlFor="capacity">Capacidade</Label>
           <Input
             id="capacity"
@@ -143,6 +156,23 @@ export default function FormularioCadastro({
               setFormData({ ...formData, capacity: e.target.value })
             }
           />
+        </div>
+
+        <div>
+          <Label htmlFor="altura_option">Altura (Opção A / B)</Label>
+          <Select
+            value={formData.altura_option}
+            onValueChange={(value) => setFormData({ ...formData, altura_option: value })}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Não informado</SelectItem>
+              <SelectItem value="A">A</SelectItem>
+              <SelectItem value="B">B</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <div>
@@ -165,6 +195,16 @@ export default function FormularioCadastro({
               <SelectItem value="inativo">Inativo</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+
+        <div>
+          <Label htmlFor="bem_matrimonial">Bem Matrimonial</Label>
+          <Input
+            id="bem_matrimonial"
+            value={formData.bem_matrimonial}
+            onChange={(e) => setFormData({ ...formData, bem_matrimonial: e.target.value })}
+            placeholder="Código do bem (ex: BM-123)"
+          />
         </div>
 
         <div>
