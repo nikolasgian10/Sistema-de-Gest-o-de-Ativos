@@ -24,7 +24,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 
 // Gera um código de ativo seguindo a regra solicitada.
-function generateAssetCode(assetType: string | undefined, sigla_local?: string | null, sector?: string | null, altura_option?: string | null) {
+function generateAssetCode(
+  assetType: string | undefined,
+  sigla_local?: string | null,
+  sector?: string | null,
+  altura_option?: string | null,
+  bem_matrimonial?: string | null
+) {
   const map: Record<string, string> = {
     ar_condicionado: 'AC',
     chiller: 'CHI',
@@ -36,14 +42,14 @@ function generateAssetCode(assetType: string | undefined, sigla_local?: string |
 
   const prefix = map[assetType || ''] || 'OUT';
 
-  // Número aleatório de 6 dígitos (ex: 910443). Pode ser substituído por sequência única do servidor.
-  const randomNum = Math.floor(100000 + Math.random() * 900000).toString();
+  // Usar o código do bem patrimonial quando fornecido (este será o identificador central solicitado)
+  const idPart = bem_matrimonial && String(bem_matrimonial).trim() ? String(bem_matrimonial).trim() : String(Date.now()).slice(-6);
 
   const sig = sigla_local ? String(sigla_local).toUpperCase().replace(/\s+/g, '-') : 'NO-SIG';
   const sec = sector ? String(sector).toUpperCase().replace(/\s+/g, '-') : 'NO-SETOR';
   const alt = altura_option ? String(altura_option).toUpperCase() : '';
 
-  return `${prefix}-${randomNum}-${sig}-${sec}${alt ? '-' + alt : ''}`;
+  return `${prefix}-${idPart}-${sig}-${sec}${alt ? '-' + alt : ''}`;
 }
 
 interface Asset {
@@ -111,6 +117,38 @@ export default function Assets() {
       setLoading(false);
     }
   };
+
+  // Detecta se o erro é violação de unicidade (Postgres 23505)
+  function isUniqueViolation(err: any) {
+    if (!err) return false;
+    const code = err?.code || err?.status || err?.statusCode;
+    if (String(code) === '23505') return true;
+    const msg = String(err?.message || err?.error || err?.details || '').toLowerCase();
+    if (msg.includes('duplicate') || msg.includes('already exists') || msg.includes('unique')) return true;
+    return false;
+  }
+
+  // Insere um ativo com retry (em caso de violação de unique constraint gera novo código e tenta novamente)
+  async function insertWithRetry(asset: any, maxAttempts = 5) {
+    let attempts = 0;
+    while (attempts < maxAttempts) {
+      attempts++;
+      try {
+        const { data: insertedData, error } = await supabase.from('assets').insert([asset]).select();
+        if (error) throw error;
+        return { insertedData, error: null };
+      } catch (err: any) {
+        if (isUniqueViolation(err)) {
+          // gerar novo código e tentar novamente
+          asset.asset_code = generateAssetCode(asset.asset_type, asset.sigla_local, asset.sector, asset.altura_option, asset.bem_matrimonial);
+          // loop continuará e tentará novamente
+          continue;
+        }
+        return { insertedData: null, error: err };
+      }
+    }
+    return { insertedData: null, error: new Error('Max attempts reached when inserting asset (possible duplicate).') };
+  }
 
   const exportarAtivos = () => {
     const rows = [
@@ -240,9 +278,15 @@ export default function Assets() {
                       assetData.operational_status = 'operacional'; // Default
                     }
 
-                    // Gerar código automaticamente se não fornecido
+                    // Gerar código automaticamente se não fornecido (usa 'bem_matrimonial' quando disponível)
                     if (!assetData.asset_code) {
-                      assetData.asset_code = generateAssetCode(assetType, assetData.sigla_local, assetData.sector, assetData.altura_option);
+                      assetData.asset_code = generateAssetCode(
+                        assetType,
+                        assetData.sigla_local,
+                        assetData.sector,
+                        assetData.altura_option,
+                        assetData.bem_matrimonial
+                      );
                     }
                     if (!assetData.location) {
                       throw new Error('Localização é obrigatória');
@@ -253,15 +297,12 @@ export default function Assets() {
                       assetData.installation_date = data.installation_date;
                     }
 
-                    // Inserir no banco
-                    const { data: insertedData, error } = await supabase
-                      .from('assets')
-                      .insert([assetData])
-                      .select();
+                    // Inserir no banco com retry para tratar colisões de asset_code
+                    const { insertedData, error: insertError } = await insertWithRetry(assetData, 5);
 
-                    if (error) {
-                      console.error('Erro do Supabase:', error);
-                      throw error;
+                    if (insertError) {
+                      console.error('Erro do Supabase ao inserir ativo:', insertError);
+                      throw insertError;
                     }
 
                     if (!insertedData || insertedData.length === 0) {
@@ -552,8 +593,10 @@ export default function Assets() {
                           validAssetType = 'ar_condicionado';
                         }
 
-                        // Gerar código se não informado (usar validAssetType)
-                        const finalAssetCode = asset_code && asset_code.trim() ? asset_code.trim() : generateAssetCode(validAssetType, sigla_local, sector, altura_option);
+                        // Gerar código se não informado (usar validAssetType e bem_matrimonial quando houver)
+                        const finalAssetCode = asset_code && asset_code.trim()
+                          ? asset_code.trim()
+                          : generateAssetCode(validAssetType, sigla_local, sector, altura_option, bem_matrimonial);
 
                         // Validar status
                         const validStatuses = ['operacional', 'manutencao', 'quebrado', 'desativado'];
@@ -594,15 +637,25 @@ export default function Assets() {
 
                     for (let i = 0; i < assetsToInsert.length; i += batchSize) {
                       const batch = assetsToInsert.slice(i, i + batchSize);
-                      const { data: insertedData, error } = await supabase
-                        .from('assets')
-                        .insert(batch)
-                        .select();
+                      // Tentar inserir em lote primeiro
+                      const { data: insertedData, error } = await supabase.from('assets').insert(batch).select();
 
                       if (error) {
                         console.error(`Erro ao inserir lote ${Math.floor(i / batchSize) + 1}:`, error);
-                        failed += batch.length;
-                        // Continuar com próximo lote mesmo se houver erro
+                        // Se for violação de unique constraint, tentar inserir cada item individualmente com retry
+                        if (isUniqueViolation(error)) {
+                          for (const item of batch) {
+                            const res = await insertWithRetry(item, 5);
+                            if (res.error) {
+                              failed += 1;
+                              console.error('Erro ao inserir item durante retry:', res.error, item);
+                            } else {
+                              inserted += res.insertedData?.length || 0;
+                            }
+                          }
+                        } else {
+                          failed += batch.length;
+                        }
                       } else {
                         inserted += insertedData?.length || 0;
                       }
