@@ -10,7 +10,6 @@
 - ✅ Planejamento Sistemático de Manutenção
 - ✅ Modo Técnico Mobile
 - ✅ Inventário Rápido
-- ✅ Gestão de Peças
 - ✅ Relatórios e Dashboard
 - ✅ Sistema de checklists
 - ✅ QR Code Scanner (com fallback para localStorage)
@@ -18,7 +17,6 @@
 ### Banco de Dados (Estrutura)
 - ✅ Migrações SQL criadas
 - ✅ Tabelas definidas:
-  - `profiles` (perfis de usuário)
   - `assets` (equipamentos)
   - `work_orders` (ordens de serviço)
   - `asset_history` (histórico)
@@ -28,7 +26,6 @@
   - `notifications` (notificações)
   - `asset_checklists` (checklists)
   - `programacao_manutencao` (programação)
-- ✅ RLS (Row Level Security) configurado
 - ✅ Triggers e funções SQL criadas
 
 ---
@@ -37,34 +34,28 @@
 
 ### 🔴 1. CONFIGURAÇÃO DO SUPABASE (CRÍTICO)
 
-#### 1.1 Criar Projeto no Supabase
 - [ ] Criar conta em https://supabase.com
 - [ ] Criar novo projeto
 - [ ] Anotar `Project URL` e `anon/public key`
 
 #### 1.2 Configurar Variáveis de Ambiente
 Criar arquivo `.env` na raiz do projeto:
-
 ```env
 VITE_SUPABASE_URL=https://seu-projeto.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sua-chave-anon-key-aqui
 ```
-
 **⚠️ IMPORTANTE:** 
 - O arquivo `.env` não deve ser commitado no Git (já deve estar no `.gitignore`)
 - Use `.env.example` como template (criar se não existir)
 
-#### 1.3 Executar Migrações no Supabase
 **Opção A - Via Supabase Studio (Recomendado para iniciantes):**
 1. Acesse https://app.supabase.com → Seu Projeto → SQL Editor
 2. Execute as migrações na ordem:
    - `20251027171255_1bbd555f-e04e-4825-8bc6-4377eed76d18.sql`
-   - `20251027220740_123553a6-24bb-473f-a46c-3e1d4f429403.sql`
    - `20250101000000_create_asset_checklists.sql`
    - `20250101000001_create_programacao_manutencao.sql`
 
 **Opção B - Via Supabase CLI:**
-```bash
 # Instalar Supabase CLI
 npm install -g supabase
 
@@ -72,7 +63,6 @@ npm install -g supabase
 supabase login
 
 # Linkar projeto
-supabase link --project-ref seu-project-ref
 
 # Aplicar migrações
 supabase db push
@@ -84,7 +74,6 @@ supabase db push
 - [ ] Permitir upload para usuários autenticados
 
 **SQL para criar bucket:**
-```sql
 -- Criar bucket
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('photos', 'photos', true);

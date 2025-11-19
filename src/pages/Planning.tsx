@@ -224,6 +224,7 @@ function getStatusSemana(
 
 export default function Planning() {
   const [anoSelecionado, setAnoSelecionado] = useState<number>(2026);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [localSelecionado, setLocalSelecionado] = useState<string>("todos");
   const [semanasParaGerar, setSemanasParaGerar] = useState<number[]>([]);
   const [gerandoOS, setGerandoOS] = useState(false);
@@ -240,7 +241,8 @@ export default function Planning() {
 
   const queryClient = useQueryClient();
 
-  // Get user email
+
+  // Get user and role
   const { data: user } = useQuery({
     queryKey: ["user"],
     queryFn: async () => {
@@ -250,6 +252,21 @@ export default function Planning() {
       return user;
     },
   });
+
+  // Fetch user role from profiles
+  useEffect(() => {
+    const fetchRole = async () => {
+      if (user?.id) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .single();
+        setUserRole(profile?.role || null);
+      }
+    };
+    fetchRole();
+  }, [user]);
 
   // Fetch assets - with cache
   const { data: ativos = [], isLoading: loadingAtivos } = useQuery({
@@ -999,13 +1016,15 @@ export default function Planning() {
                 <SelectItem value="2027">2027</SelectItem>
               </SelectContent>
             </Select>
-            <Button
-              onClick={() => setMostrarDialogCriarPlano(true)}
-              className="bg-purple-600 hover:bg-purple-700 h-9 text-sm"
-            >
-              <Plus className="h-3.5 w-3.5 mr-1.5" />
-              Criar Novo Plano
-            </Button>
+            {userRole !== "tecnico" && (
+              <Button
+                onClick={() => setMostrarDialogCriarPlano(true)}
+                className="bg-purple-600 hover:bg-purple-700 h-9 text-sm"
+              >
+                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                Criar Novo Plano
+              </Button>
+            )}
             {semanasParaGerar.length > 0 && (
               <Button
                 onClick={() => {
@@ -1179,14 +1198,16 @@ export default function Planning() {
                           </Badge>
                         )}
                           </div>
-                      <Button
-                        size="sm"
-                        onClick={() => abrirDialogProgramacao(predio)}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white h-8 text-xs"
-                      >
-                        <Settings className="h-3 w-3 mr-1.5" />
-                        Programar Semanas
-                      </Button>
+                      {userRole !== "tecnico" && (
+                        <Button
+                          size="sm"
+                          onClick={() => abrirDialogProgramacao(predio)}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white h-8 text-xs"
+                        >
+                          <Settings className="h-3 w-3 mr-1.5" />
+                          Programar Semanas
+                        </Button>
+                      )}
                         </div>
                   </CardHeader>
                   <CardContent className="p-0">

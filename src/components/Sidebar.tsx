@@ -1,3 +1,4 @@
+type Profile = { full_name?: string; email?: string; role?: string };
 import { 
   LayoutDashboard, 
   Package, 
@@ -59,6 +60,7 @@ export function Sidebar() {
   const navigate = useNavigate();
   const isCollapsed = state === "collapsed";
   const [isAdmin, setIsAdmin] = useState(false);
+  const [profile, setProfile] = useState<{ full_name: string; email: string; role?: string } | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -67,10 +69,22 @@ export function Sidebar() {
         const { data } = await supabase.auth.getUser();
         const user = data?.user;
         if (!user) return;
-        const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-        if (mounted) setIsAdmin(profile?.role === "admin");
+        // Buscar perfil completo
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("full_name, email, role")
+          .eq("id", user.id)
+          .single<Profile>();
+        if (mounted) {
+          setIsAdmin(profileData?.role === "admin");
+          setProfile({
+            full_name: profileData?.full_name ?? user.email ?? "Usuário",
+            email: profileData?.email ?? user.email ?? "",
+            role: profileData?.role ?? null,
+          });
+        }
       } catch (e) {
-        console.error("Error checking admin role:", e);
+        console.error("Error checking admin role/profile:", e);
       }
     })();
     return () => { mounted = false };
@@ -177,64 +191,134 @@ export function Sidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <SidebarMenuButton asChild>
-                          <NavLink
-                            to={item.url}
-                            end
-                            className={({ isActive }) =>
-                              isActive
-                                ? "flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-50 text-blue-700 font-medium transition-all duration-200 mb-1 whitespace-normal"
-                                : "flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 text-slate-700 mb-1 whitespace-normal"
-                            }
-                          >
-                            <item.icon className="h-5 w-5 flex-shrink-0" />
-                            {!isCollapsed && <span className="font-medium whitespace-normal">{item.title}</span>}
-                          </NavLink>
-                        </SidebarMenuButton>
-                      </TooltipTrigger>
-                      {isCollapsed && (
-                        <TooltipContent side="right">
-                          <p>{item.title}</p>
-                        </TooltipContent>
-                      )}
-                    </Tooltip>
-                  </TooltipProvider>
-                </SidebarMenuItem>
-              ))}
 
-              {isAdmin && (
-                <SidebarMenuItem>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <SidebarMenuButton asChild>
-                          <NavLink
-                            to="/admin/users"
-                            className={({ isActive }) =>
-                              isActive
-                                ? "flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-50 text-blue-700 font-medium transition-all duration-200 mb-1 whitespace-normal"
-                                : "flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 text-slate-700 mb-1 whitespace-normal"
-                            }
-                          >
-                            <Users className="h-5 w-5 flex-shrink-0" />
-                            {!isCollapsed && <span className="font-medium whitespace-normal">Gerenciamento de Usuários</span>}
-                          </NavLink>
-                        </SidebarMenuButton>
-                      </TooltipTrigger>
-                      {isCollapsed && (
-                        <TooltipContent side="right">
-                          <p>Gerenciamento de Usuários</p>
-                        </TooltipContent>
-                      )}
-                    </Tooltip>
-                  </TooltipProvider>
-                </SidebarMenuItem>
+              {/* Menus para cada papel */}
+
+              {/* Menus para admin: tudo do menuItems + Gerenciamento de Usuários */}
+              {profile?.role === "admin" && (
+                <>
+                  {menuItems.map((item) => (
+                    <SidebarMenuItem key={item.title}>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <SidebarMenuButton asChild>
+                              <NavLink
+                                to={item.url}
+                                end
+                                className={({ isActive }) =>
+                                  isActive
+                                    ? "flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-50 text-blue-700 font-medium transition-all duration-200 mb-1 whitespace-normal"
+                                    : "flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 text-slate-700 mb-1 whitespace-normal"
+                                }
+                              >
+                                <item.icon className="h-5 w-5 flex-shrink-0" />
+                                {!isCollapsed && <span className="font-medium whitespace-normal">{item.title}</span>}
+                              </NavLink>
+                            </SidebarMenuButton>
+                          </TooltipTrigger>
+                          {isCollapsed && (
+                            <TooltipContent side="right">
+                              <p>{item.title}</p>
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
+                      </TooltipProvider>
+                    </SidebarMenuItem>
+                  ))}
+                  <SidebarMenuItem key="Gerenciamento de Usuários">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <SidebarMenuButton asChild>
+                            <NavLink
+                              to="/admin/users"
+                              className={({ isActive }) =>
+                                isActive
+                                  ? "flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-50 text-blue-700 font-medium transition-all duration-200 mb-1 whitespace-normal"
+                                  : "flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 text-slate-700 mb-1 whitespace-normal"
+                              }
+                            >
+                              <Users className="h-5 w-5 flex-shrink-0" />
+                              {!isCollapsed && <span className="font-medium whitespace-normal">Gerenciamento de Usuários</span>}
+                            </NavLink>
+                          </SidebarMenuButton>
+                        </TooltipTrigger>
+                        {isCollapsed && (
+                          <TooltipContent side="right">
+                            <p>Gerenciamento de Usuários</p>
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+                    </TooltipProvider>
+                  </SidebarMenuItem>
+                </>
               )}
+
+              {/* Menus para gestor: tudo do menuItems, exceto Gerenciamento de Usuários */}
+              {profile?.role === "gestor" && (
+                <>
+                  {menuItems.map((item) => (
+                    item.title !== "Gerenciamento de Usuários" && (
+                      <SidebarMenuItem key={item.title}>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <SidebarMenuButton asChild>
+                                <NavLink
+                                  to={item.url}
+                                  end
+                                  className={({ isActive }) =>
+                                    isActive
+                                      ? "flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-50 text-blue-700 font-medium transition-all duration-200 mb-1 whitespace-normal"
+                                      : "flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 text-slate-700 mb-1 whitespace-normal"
+                                  }
+                                >
+                                  <item.icon className="h-5 w-5 flex-shrink-0" />
+                                  {!isCollapsed && <span className="font-medium whitespace-normal">{item.title}</span>}
+                                </NavLink>
+                              </SidebarMenuButton>
+                            </TooltipTrigger>
+                            {isCollapsed && (
+                              <TooltipContent side="right">
+                                <p>{item.title}</p>
+                              </TooltipContent>
+                            )}
+                          </Tooltip>
+                        </TooltipProvider>
+                      </SidebarMenuItem>
+                    )
+                  ))}
+                </>
+              )}
+
+              {/* Menus para técnico: apenas os permitidos */}
+              {profile?.role === "tecnico" && (
+                <>
+                  <SidebarMenuItem>
+                    <TooltipProvider><Tooltip><TooltipTrigger asChild><SidebarMenuButton asChild><NavLink to="/" end className={({ isActive }) => isActive ? "flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-50 text-blue-700 font-medium transition-all duration-200 mb-1 whitespace-normal" : "flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 text-slate-700 mb-1 whitespace-normal"}><LayoutDashboard className="h-5 w-5 flex-shrink-0" />{!isCollapsed && <span className="font-medium whitespace-normal">Painel de Controle</span>}</NavLink></SidebarMenuButton></TooltipTrigger>{isCollapsed && <TooltipContent side="right"><p>Painel de Controle</p></TooltipContent>}</Tooltip></TooltipProvider>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <TooltipProvider><Tooltip><TooltipTrigger asChild><SidebarMenuButton asChild><NavLink to="/ativos" className={({ isActive }) => isActive ? "flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-50 text-blue-700 font-medium transition-all duration-200 mb-1 whitespace-normal" : "flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 text-slate-700 mb-1 whitespace-normal"}><Package className="h-5 w-5 flex-shrink-0" />{!isCollapsed && <span className="font-medium whitespace-normal">Ativos</span>}</NavLink></SidebarMenuButton></TooltipTrigger>{isCollapsed && <TooltipContent side="right"><p>Ativos</p></TooltipContent>}</Tooltip></TooltipProvider>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <TooltipProvider><Tooltip><TooltipTrigger asChild><SidebarMenuButton asChild><NavLink to="/ordens" className={({ isActive }) => isActive ? "flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-50 text-blue-700 font-medium transition-all duration-200 mb-1 whitespace-normal" : "flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 text-slate-700 mb-1 whitespace-normal"}><FileText className="h-5 w-5 flex-shrink-0" />{!isCollapsed && <span className="font-medium whitespace-normal">Ordens de Serviço</span>}</NavLink></SidebarMenuButton></TooltipTrigger>{isCollapsed && <TooltipContent side="right"><p>Ordens de Serviço</p></TooltipContent>}</Tooltip></TooltipProvider>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <TooltipProvider><Tooltip><TooltipTrigger asChild><SidebarMenuButton asChild><NavLink to="/planejamento" className={({ isActive }) => isActive ? "flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-50 text-blue-700 font-medium transition-all duration-200 mb-1 whitespace-normal" : "flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 text-slate-700 mb-1 whitespace-normal"}><Calendar className="h-5 w-5 flex-shrink-0" />{!isCollapsed && <span className="font-medium whitespace-normal">Planejamento Sistemático</span>}</NavLink></SidebarMenuButton></TooltipTrigger>{isCollapsed && <TooltipContent side="right"><p>Planejamento Sistemático</p></TooltipContent>}</Tooltip></TooltipProvider>
+                  </SidebarMenuItem>
+                  {/* Inventário Rápido antes */}
+                  <SidebarMenuItem>
+                    <TooltipProvider><Tooltip><TooltipTrigger asChild><SidebarMenuButton asChild><NavLink to="/inventario" className={({ isActive }) => isActive ? "flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-50 text-blue-700 font-medium transition-all duration-200 mb-1 whitespace-normal" : "flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 text-slate-700 mb-1 whitespace-normal"}><ScanBarcode className="h-5 w-5 flex-shrink-0" />{!isCollapsed && <span className="font-medium whitespace-normal">Inventário Rápido</span>}</NavLink></SidebarMenuButton></TooltipTrigger>{isCollapsed && <TooltipContent side="right"><p>Inventário Rápido</p></TooltipContent>}</Tooltip></TooltipProvider>
+                  </SidebarMenuItem>
+                  {/* Técnico Mobile depois */}
+                  <SidebarMenuItem>
+                    <TooltipProvider><Tooltip><TooltipTrigger asChild><SidebarMenuButton asChild><NavLink to="/tecnico-mobile" className={({ isActive }) => isActive ? "flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-50 text-blue-700 font-medium transition-all duration-200 mb-1 whitespace-normal" : "flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 text-slate-700 mb-1 whitespace-normal"}><Smartphone className="h-5 w-5 flex-shrink-0" />{!isCollapsed && <span className="font-medium whitespace-normal">Técnico Mobile</span>}</NavLink></SidebarMenuButton></TooltipTrigger>{isCollapsed && <TooltipContent side="right"><p>Técnico Mobile</p></TooltipContent>}</Tooltip></TooltipProvider>
+                  </SidebarMenuItem>
+                </>
+              )}
+
+
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -316,8 +400,8 @@ export function Sidebar() {
               <User className="w-5 h-5 text-slate-600" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-medium text-slate-900 text-sm truncate">nikolas souza</p>
-              <p className="text-xs text-slate-500 truncate">nikolasgian10@gmail.com</p>
+              <p className="font-medium text-slate-900 text-sm truncate">{profile?.full_name || "Usuário"}</p>
+              <p className="text-xs text-slate-500 truncate">{profile?.email || ""}</p>
             </div>
           </div>
         ) : (
