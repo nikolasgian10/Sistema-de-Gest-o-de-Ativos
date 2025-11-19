@@ -105,7 +105,13 @@ export default function AssetDetail() {
         .single();
 
       if (error) throw error;
-      setAsset(data);
+      if (!data) {
+        // Nenhum ativo retornado
+        toast.error("Ativo não encontrado");
+        navigate("/ativos");
+        return;
+      }
+      setAsset(data as unknown as Asset);
     } catch (error: any) {
       console.error("Error fetching asset:", error);
       toast.error("Erro ao carregar ativo: " + (error?.message || "Erro desconhecido"));
@@ -135,7 +141,7 @@ export default function AssetDetail() {
       }
 
       // Verificar se algum dos campos que compõem o código mudou
-      const fieldsToCompare = ['asset_type', 'sigla_local', 'sector', 'altura_option', 'bem_patrimonial'];
+      const fieldsToCompare = ['asset_type', 'sigla_local', 'location', 'altura_option', 'bem_patrimonial'];
       const composingChanged = fieldsToCompare.some((f) => {
         const newVal = (updateData as any)[f] ?? (asset as any)[f];
         const oldVal = (asset as any)[f];
@@ -169,7 +175,7 @@ export default function AssetDetail() {
         updateData.asset_code = generateAssetCode(
           updateData.asset_type || asset.asset_type,
           updateData.sigla_local ?? asset.sigla_local,
-          updateData.sector ?? asset.sector,
+          updateData.location ?? asset.location,
           updateData.altura_option ?? asset.altura_option,
           updateData.bem_patrimonial ?? asset.bem_patrimonial
         );
@@ -185,19 +191,19 @@ export default function AssetDetail() {
       const removedColumns = new Set<string>();
       while (attempts < 5) {
         attempts++;
-        const { error } = await supabase.from("assets").update(updateData).eq("id", asset.id);
-        if (!error) {
+        const { error: updateError } = await supabase.from("assets").update(updateData).eq("id", asset.id);
+        if (!updateError) {
           lastError = null;
           break;
         }
-        lastError = error;
+        lastError = updateError;
 
         // Se for violação de unique constraint, gere outro código e continue
-        if (isUniqueViolation(error)) {
+        if (isUniqueViolation(updateError)) {
           updateData.asset_code = generateAssetCode(
             updateData.asset_type || asset.asset_type,
             updateData.sigla_local ?? asset.sigla_local,
-            updateData.sector ?? asset.sector,
+            updateData.location ?? asset.location,
             updateData.altura_option ?? asset.altura_option,
             (updateData.bem_patrimonial ?? asset.bem_patrimonial) ? String(updateData.bem_patrimonial ?? asset.bem_patrimonial).trim() + `-${attempts}` : undefined
           );
@@ -206,7 +212,8 @@ export default function AssetDetail() {
 
         // Se o PostgREST reclamar que uma coluna não existe (ex: "Could not find the 'X' column..."),
         // remova essa coluna do payload e tente novamente. Isso permite salvar mesmo sem aplicar todas as migrations.
-        const msg = String(error?.message || error?.error || error?.details || '');
+        const ue: any = updateError;
+        const msg = String(ue?.message || ue?.details || ue?.hint || ue?.code || ue || '');
         const missingColMatch = msg.match(/Could not find the '([^']+)' column/i);
         if (missingColMatch) {
           const col = missingColMatch[1];

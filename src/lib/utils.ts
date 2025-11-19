@@ -8,7 +8,7 @@ export function cn(...inputs: ClassValue[]) {
 export function generateAssetCode(
   assetType: string | undefined,
   sigla_local?: string | null,
-  sector?: string | null,
+  location?: string | null,
   altura_option?: string | null,
   bem_patrimonial?: string | null
 ) {
@@ -27,7 +27,7 @@ export function generateAssetCode(
   const idPart = bem_patrimonial && String(bem_patrimonial).trim() ? String(bem_patrimonial).trim() : String(Date.now()).slice(-6);
 
   const sig = sigla_local ? String(sigla_local).toUpperCase().replace(/\s+/g, '-') : 'NO-SIG';
-  const sec = sector ? String(sector).toUpperCase().replace(/\s+/g, '-') : 'NO-SETOR';
+  const sec = location ? String(location).toUpperCase().replace(/\s+/g, '-') : 'NO-LOCAL';
   const alt = altura_option ? String(altura_option).toUpperCase() : '';
 
   return `${prefix}-${idPart}-${sig}-${sec}${alt ? '-' + alt : ''}`;

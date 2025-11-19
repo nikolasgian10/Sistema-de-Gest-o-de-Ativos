@@ -104,7 +104,7 @@ export default function Assets() {
       } catch (err: any) {
         if (isUniqueViolation(err)) {
           // gerar novo código e tentar novamente
-          asset.asset_code = generateAssetCode(asset.asset_type, asset.sigla_local, asset.sector, asset.altura_option, asset.bem_patrimonial);
+          asset.asset_code = generateAssetCode(asset.asset_type, asset.sigla_local, asset.location, asset.altura_option, asset.bem_patrimonial);
           // loop continuará e tentará novamente
           continue;
         }
@@ -245,12 +245,12 @@ export default function Assets() {
                     // Gerar código automaticamente se não fornecido (usa 'bem_patrimonial' quando disponível)
                     if (!assetData.asset_code) {
                         assetData.asset_code = generateAssetCode(
-                        assetType,
-                        assetData.sigla_local,
-                        assetData.sector,
-                        assetData.altura_option,
-                        assetData.bem_patrimonial
-                      );
+                          assetType,
+                          assetData.sigla_local,
+                          assetData.location,
+                          assetData.altura_option,
+                          assetData.bem_patrimonial
+                        );
                     }
                     if (!assetData.location) {
                       throw new Error('Localização é obrigatória');
@@ -582,7 +582,7 @@ export default function Assets() {
                         // Gerar código se não informado (usar validAssetType e bem_patrimonial quando houver)
                         const finalAssetCode = asset_code && asset_code.trim()
                           ? asset_code.trim()
-                          : generateAssetCode(validAssetType, sigla_local, sector, altura_option, bem_patrimonial);
+                          : generateAssetCode(validAssetType, sigla_local, location, altura_option, bem_patrimonial);
 
                         // Validar status
                         const validStatuses = ['operacional', 'manutencao', 'quebrado', 'desativado'];
