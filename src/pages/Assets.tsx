@@ -22,35 +22,9 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { generateAssetCode, isUniqueViolation } from "@/lib/utils";
 
-// Gera um código de ativo seguindo a regra solicitada.
-function generateAssetCode(
-  assetType: string | undefined,
-  sigla_local?: string | null,
-  sector?: string | null,
-  altura_option?: string | null,
-  bem_matrimonial?: string | null
-) {
-  const map: Record<string, string> = {
-    ar_condicionado: 'AC',
-    chiller: 'CHI',
-    split: 'SPT',
-    mecalor: 'MEC',
-    ar_maquina: 'AMQ',
-    outro: 'OUT',
-  };
-
-  const prefix = map[assetType || ''] || 'OUT';
-
-  // Usar o código do bem patrimonial quando fornecido (este será o identificador central solicitado)
-  const idPart = bem_matrimonial && String(bem_matrimonial).trim() ? String(bem_matrimonial).trim() : String(Date.now()).slice(-6);
-
-  const sig = sigla_local ? String(sigla_local).toUpperCase().replace(/\s+/g, '-') : 'NO-SIG';
-  const sec = sector ? String(sector).toUpperCase().replace(/\s+/g, '-') : 'NO-SETOR';
-  const alt = altura_option ? String(altura_option).toUpperCase() : '';
-
-  return `${prefix}-${idPart}-${sig}-${sec}${alt ? '-' + alt : ''}`;
-}
+// generateAssetCode moved to utils and imported above
 
 interface Asset {
   id: string;
@@ -62,7 +36,7 @@ interface Asset {
   operational_status: string;
   qr_code?: string | null;
   sigla_local?: string | null;
-  bem_matrimonial?: string | null;
+  bem_patrimonial?: string | null;
   altura_option?: string | null;
 }
 
@@ -118,16 +92,6 @@ export default function Assets() {
     }
   };
 
-  // Detecta se o erro é violação de unicidade (Postgres 23505)
-  function isUniqueViolation(err: any) {
-    if (!err) return false;
-    const code = err?.code || err?.status || err?.statusCode;
-    if (String(code) === '23505') return true;
-    const msg = String(err?.message || err?.error || err?.details || '').toLowerCase();
-    if (msg.includes('duplicate') || msg.includes('already exists') || msg.includes('unique')) return true;
-    return false;
-  }
-
   // Insere um ativo com retry (em caso de violação de unique constraint gera novo código e tenta novamente)
   async function insertWithRetry(asset: any, maxAttempts = 5) {
     let attempts = 0;
@@ -140,7 +104,7 @@ export default function Assets() {
       } catch (err: any) {
         if (isUniqueViolation(err)) {
           // gerar novo código e tentar novamente
-          asset.asset_code = generateAssetCode(asset.asset_type, asset.sigla_local, asset.sector, asset.altura_option, asset.bem_matrimonial);
+          asset.asset_code = generateAssetCode(asset.asset_type, asset.sigla_local, asset.sector, asset.altura_option, asset.bem_patrimonial);
           // loop continuará e tentará novamente
           continue;
         }
@@ -261,7 +225,7 @@ export default function Assets() {
                       location: data.location?.trim(),
                       sector: data.sector?.trim() || null,
                       sigla_local: data.sigla_local?.trim() || null,
-                      bem_matrimonial: data.bem_matrimonial?.trim() || null,
+                      bem_patrimonial: data.bem_patrimonial?.trim() || null,
                       altura_option: data.altura_option && data.altura_option !== 'none' ? data.altura_option : null,
                       capacity: data.capacity?.trim() || null,
                       operational_status: data.operational_status || 'operacional',
@@ -278,14 +242,14 @@ export default function Assets() {
                       assetData.operational_status = 'operacional'; // Default
                     }
 
-                    // Gerar código automaticamente se não fornecido (usa 'bem_matrimonial' quando disponível)
+                    // Gerar código automaticamente se não fornecido (usa 'bem_patrimonial' quando disponível)
                     if (!assetData.asset_code) {
-                      assetData.asset_code = generateAssetCode(
+                        assetData.asset_code = generateAssetCode(
                         assetType,
                         assetData.sigla_local,
                         assetData.sector,
                         assetData.altura_option,
-                        assetData.bem_matrimonial
+                        assetData.bem_patrimonial
                       );
                     }
                     if (!assetData.location) {
@@ -486,12 +450,14 @@ export default function Assets() {
               <DialogDescription className="space-y-2">
                 <div>Cole os dados dos ativos no formato CSV. Um ativo por linha.</div>
                 <div>
-                  <strong>Formato:</strong> Código;Tipo;Marca;Modelo;Localização;Setor;Sigla;BemMatrimonial;Altura;Status
+                  <strong>Formato:</strong> Código;Tipo;Marca;Modelo;Localização;Setor;Sigla;BemPatrimonial;Altura;Status
                 </div>
                 <div>
-                  <strong>Obrigatórios:</strong> Código, Tipo, Localização
+                  <strong>Obrigatórios:</strong> Tipo, Localização
                   <br />
-                  <strong>Opcionais:</strong> Marca, Modelo, Setor, Sigla, BemMatrimonial, Altura (A/B), Status
+                  <strong>Código:</strong> Opcional — será gerado automaticamente se estiver vazio (usa BemPatrimonial quando disponível)
+                  <br />
+                  <strong>Opcionais:</strong> Marca, Modelo, Setor, Sigla, BemPatrimonial, Altura (A/B), Status
                 </div>
                 <div>
                   <strong>Exemplo completo:</strong> AC-001;ar_condicionado;LG;Split 12k;Sala 101;Administração;SL-01;BM-123;A;operacional
@@ -566,6 +532,26 @@ export default function Assets() {
                         const parts = line.split(/[;,]/).map(p => p.trim());
 
                         // Mapear posições (compatível com formato antigo)
+                        // Detecta linhas em que foi adicionado um separador a mais no início (ex: ";;ar_condicionado;...")
+                        // e realinha removendo a célula vazia extra.
+                        if ((parts[1] === undefined || parts[1] === '') && parts[2]) {
+                          const raw = String(parts[2]).toLowerCase();
+                          // normalizar removendo caracteres não alfanuméricos para detectar variações
+                          const tNorm = raw.replace(/[^a-z0-9]/g, '');
+                          // checar se parts[2] parece ser um tipo conhecido
+                          if (
+                            tNorm.startsWith('arcond') ||
+                            tNorm.startsWith('chill') ||
+                            tNorm.startsWith('split') ||
+                            tNorm.startsWith('mecalor') ||
+                            tNorm.startsWith('armaq') ||
+                            tNorm.startsWith('outro')
+                          ) {
+                            // remover a célula vazia na posição 1 para realinhar
+                            parts.splice(1, 1);
+                          }
+                        }
+
                         const asset_code = parts[0];
                         const asset_type = parts[1];
                         const brand = parts[2] || '';
@@ -573,7 +559,7 @@ export default function Assets() {
                         const location = parts[4] || '';
                         const sector = parts[5] || '';
                         const sigla_local = parts[6] || '';
-                        const bem_matrimonial = parts[7] || '';
+                        const bem_patrimonial = parts[7] || '';
                         const altura_option = parts[8] || '';
                         const operational_status = parts[9] || '';
 
@@ -593,10 +579,10 @@ export default function Assets() {
                           validAssetType = 'ar_condicionado';
                         }
 
-                        // Gerar código se não informado (usar validAssetType e bem_matrimonial quando houver)
+                        // Gerar código se não informado (usar validAssetType e bem_patrimonial quando houver)
                         const finalAssetCode = asset_code && asset_code.trim()
                           ? asset_code.trim()
-                          : generateAssetCode(validAssetType, sigla_local, sector, altura_option, bem_matrimonial);
+                          : generateAssetCode(validAssetType, sigla_local, sector, altura_option, bem_patrimonial);
 
                         // Validar status
                         const validStatuses = ['operacional', 'manutencao', 'quebrado', 'desativado'];
@@ -614,7 +600,7 @@ export default function Assets() {
                           location: location.trim(),
                           sector: sector?.trim() || null,
                           sigla_local: sigla_local?.trim() || null,
-                          bem_matrimonial: bem_matrimonial?.trim() || null,
+                          bem_patrimonial: bem_patrimonial?.trim() || null,
                           altura_option: altura_option && altura_option !== 'none' ? altura_option : null,
                           operational_status: validStatus,
                           created_by: profile?.id || null,

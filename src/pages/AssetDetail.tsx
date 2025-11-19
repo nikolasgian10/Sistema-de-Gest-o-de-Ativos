@@ -10,6 +10,7 @@ import FormularioCadastro from "@/components/ativos/FormularioCadastro";
 import { ArrowLeft, Edit, Package, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import AssetChecklistEditor from "@/components/ativos/AssetChecklistEditor";
+import { generateAssetCode, isUniqueViolation } from "@/lib/utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -65,7 +66,7 @@ interface Asset {
   purchase_cost: number | null;
   technical_specs: string | null;
   notes: string | null;
-  bem_matrimonial?: string | null;
+  bem_patrimonial?: string | null;
   sigla_local?: string | null;
   altura_option?: string | null;
   created_at: string;
@@ -122,16 +123,112 @@ export default function AssetDetail() {
       const updateData: any = {
         ...formData,
         sigla_local: formData.sigla_local?.trim?.() || null,
-        bem_matrimonial: formData.bem_matrimonial && formData.bem_matrimonial !== 'none' ? formData.bem_matrimonial : null,
+        bem_patrimonial: formData.bem_patrimonial && formData.bem_patrimonial !== 'none' ? formData.bem_patrimonial?.trim() : null,
         altura_option: formData.altura_option && formData.altura_option !== 'none' ? formData.altura_option : null,
       };
 
-      const { error } = await supabase
-        .from("assets")
-        .update(updateData)
-        .eq("id", asset.id);
+      // Normalizar e validar tipo (mesma lógica usada ao criar)
+      let newType = updateData.asset_type;
+      if (newType === 'chiller' || newType === 'split' || newType === 'outro') {
+        newType = 'ar_condicionado';
+        updateData.asset_type = newType;
+      }
 
-      if (error) throw error;
+      // Verificar se algum dos campos que compõem o código mudou
+      const fieldsToCompare = ['asset_type', 'sigla_local', 'sector', 'altura_option', 'bem_patrimonial'];
+      const composingChanged = fieldsToCompare.some((f) => {
+        const newVal = (updateData as any)[f] ?? (asset as any)[f];
+        const oldVal = (asset as any)[f];
+        return String(newVal ?? '').trim() !== String(oldVal ?? '').trim();
+      });
+
+      // Normalizar campos de data e numéricos: não envie string vazia para colunas DATE/NUMERIC
+      const dateFields = ['installation_date', 'warranty_expiration', 'last_maintenance'];
+      dateFields.forEach((df) => {
+        if (updateData[df] === "" || updateData[df] === undefined) {
+          updateData[df] = null;
+        }
+      });
+
+      if (updateData.purchase_cost === "" || updateData.purchase_cost === undefined) {
+        updateData.purchase_cost = null;
+      } else if (updateData.purchase_cost !== null) {
+        const n = Number(String(updateData.purchase_cost).replace(',', '.'));
+        updateData.purchase_cost = Number.isFinite(n) ? n : null;
+      }
+
+      // Campos textuais opcionais: normalize empty -> null
+      const textOptionals = ['maintenance_frequency', 'technical_specs', 'notes'];
+      textOptionals.forEach((t) => {
+        if (updateData[t] === "" || updateData[t] === undefined) updateData[t] = null;
+      });
+
+      // Se o usuário não editou manualmente o asset_code (ou deixou igual ao anterior) e os campos
+      // que compõem o código mudaram, gere um novo código automaticamente.
+      if (( !formData.asset_code || String(formData.asset_code).trim() === String(asset.asset_code).trim() ) && composingChanged) {
+        updateData.asset_code = generateAssetCode(
+          updateData.asset_type || asset.asset_type,
+          updateData.sigla_local ?? asset.sigla_local,
+          updateData.sector ?? asset.sector,
+          updateData.altura_option ?? asset.altura_option,
+          updateData.bem_patrimonial ?? asset.bem_patrimonial
+        );
+      } else if (formData.asset_code && String(formData.asset_code).trim() !== String(asset.asset_code).trim()) {
+        // Usuário especificou código manualmente
+        updateData.asset_code = String(formData.asset_code).trim();
+      }
+
+      // Tentar atualizar com retry em caso de violação de unique constraint do asset_code
+      // e tentar novamente sem `last_maintenance` se o PostgREST reclamar que a coluna não existe.
+      let attempts = 0;
+      let lastError: any = null;
+      const removedColumns = new Set<string>();
+      while (attempts < 5) {
+        attempts++;
+        const { error } = await supabase.from("assets").update(updateData).eq("id", asset.id);
+        if (!error) {
+          lastError = null;
+          break;
+        }
+        lastError = error;
+
+        // Se for violação de unique constraint, gere outro código e continue
+        if (isUniqueViolation(error)) {
+          updateData.asset_code = generateAssetCode(
+            updateData.asset_type || asset.asset_type,
+            updateData.sigla_local ?? asset.sigla_local,
+            updateData.sector ?? asset.sector,
+            updateData.altura_option ?? asset.altura_option,
+            (updateData.bem_patrimonial ?? asset.bem_patrimonial) ? String(updateData.bem_patrimonial ?? asset.bem_patrimonial).trim() + `-${attempts}` : undefined
+          );
+          continue;
+        }
+
+        // Se o PostgREST reclamar que uma coluna não existe (ex: "Could not find the 'X' column..."),
+        // remova essa coluna do payload e tente novamente. Isso permite salvar mesmo sem aplicar todas as migrations.
+        const msg = String(error?.message || error?.error || error?.details || '');
+        const missingColMatch = msg.match(/Could not find the '([^']+)' column/i);
+        if (missingColMatch) {
+          const col = missingColMatch[1];
+          if (!removedColumns.has(col)) {
+            removedColumns.add(col);
+            delete (updateData as any)[col as any];
+            continue;
+          }
+        }
+        // Também aceite identificação via código PGRST204 ou menções diretas (fallback):
+        const lower = msg.toLowerCase();
+        if (!removedColumns.has('last_maintenance') && (lower.includes('pgrst204') && lower.includes('last_maintenance'))) {
+          removedColumns.add('last_maintenance');
+          delete (updateData as any).last_maintenance;
+          continue;
+        }
+
+        // outro erro: parar e repassar
+        break;
+      }
+
+      if (lastError) throw lastError;
 
       toast.success("Ativo atualizado com sucesso!");
       setIsEditing(false);
@@ -430,10 +527,10 @@ export default function AssetDetail() {
                   </p>
                 </div>
               )}
-              {asset.bem_matrimonial && (
+              {asset.bem_patrimonial && (
                 <div>
-                  <p className="text-sm text-muted-foreground">Bem Matrimonial</p>
-                  <p className="font-medium">{asset.bem_matrimonial}</p>
+                  <p className="text-sm text-muted-foreground">Bem Patrimonial</p>
+                  <p className="font-medium">{asset.bem_patrimonial}</p>
                 </div>
               )}
               {asset.technical_specs && (

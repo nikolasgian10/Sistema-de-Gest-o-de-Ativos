@@ -39,7 +39,7 @@ export default function FormularioCadastro({
     purchase_cost: initialData?.purchase_cost || "",
     technical_specs: initialData?.technical_specs || "",
     notes: initialData?.notes || "",
-    bem_matrimonial: initialData?.bem_matrimonial || "",
+     bem_patrimonial: initialData?.bem_patrimonial || "",
     sigla_local: initialData?.sigla_local || "",
     altura_option: initialData?.altura_option || "",
   });
@@ -198,13 +198,13 @@ export default function FormularioCadastro({
         </div>
 
         <div>
-          <Label htmlFor="bem_matrimonial">Bem Matrimonial</Label>
-          <Input
-            id="bem_matrimonial"
-            value={formData.bem_matrimonial}
-            onChange={(e) => setFormData({ ...formData, bem_matrimonial: e.target.value })}
-            placeholder="Código do bem (ex: BM-123)"
-          />
+            <Label htmlFor="bem_patrimonial">Bem Patrimonial</Label>
+            <Input
+              id="bem_patrimonial"
+              value={formData.bem_patrimonial}
+              onChange={(e) => setFormData({ ...formData, bem_patrimonial: e.target.value })}
+              placeholder="Código do bem (ex: BP-123)"
+            />
         </div>
 
         <div>
