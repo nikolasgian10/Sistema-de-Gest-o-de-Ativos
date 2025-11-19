@@ -367,6 +367,7 @@ export default function Assets() {
                             <Button variant="outline" size="icon" onClick={() => navigate(`/ativos/${asset.id}?edit=1`)}>
                               <Pencil className="h-4 w-4" />
                             </Button>
+                            {/* delete button removed from list; use detail view to delete */}
                           </div>
                         </TableCell>
                       </TableRow>

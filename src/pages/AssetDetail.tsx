@@ -372,33 +372,23 @@ export default function AssetDetail() {
               <Edit className="h-4 w-4" />
               Editar
             </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" className="gap-2">
-                  <Trash2 className="h-4 w-4" />
-                  Excluir
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Tem certeza que deseja excluir o ativo <strong>{asset.asset_code}</strong>?
-                    Esta ação não pode ser desfeita.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={handleDelete}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    disabled={isDeleting}
-                  >
-                    {isDeleting ? "Excluindo..." : "Excluir"}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            {/* Fallback visível: botão de exclusão direto (confirma via browser) */}
+            <Button
+              id="delete-fallback"
+              variant="destructive"
+              className="gap-2"
+              style={{ position: 'relative', zIndex: 9999 }}
+              onClick={() => {
+                if (!asset) return;
+                const ok = window.confirm(`Tem certeza que deseja excluir o ativo ${asset.asset_code}? Esta ação não pode ser desfeita.`);
+                if (ok) handleDelete();
+              }}
+            >
+              <Trash2 className="h-4 w-4" />
+              Excluir
+            </Button>
+
+            {/* AlertDialog removed — fallback delete button retained */}
           </div>
         </div>
 
