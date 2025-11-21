@@ -41,6 +41,8 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
+import clearClientSession from "@/lib/sessionUtils";
 
 const menuItems = [
   { title: "Painel de Controle", url: "/", icon: LayoutDashboard },
@@ -152,14 +154,19 @@ export function Sidebar() {
   const upcomingCount = alertsData?.upcoming?.length || 0;
   const totalAlerts = delayedCount + pendingCount;
 
+  const queryClient = useQueryClient();
+
   const handleLogout = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
+    try {
+      await clearClientSession({ queryClient });
+      toast.success("Logout realizado com sucesso");
+      // navigate to auth after reload fallback
+      try {
+        navigate("/auth");
+      } catch (e) {}
+    } catch (e) {
       toast.error("Erro ao sair");
-      return;
     }
-    toast.success("Logout realizado com sucesso");
-    navigate("/auth");
   };
 
   return (
