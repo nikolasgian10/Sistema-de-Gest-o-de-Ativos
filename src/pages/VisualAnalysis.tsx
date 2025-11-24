@@ -21,6 +21,7 @@ import { CorrectiveByAreaChart } from "@/components/charts/CorrectiveByAreaChart
 
 export default function VisualAnalysis() {
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<string>("planejamento");
   const [selectedTechnician, setSelectedTechnician] = useState<string>("Tech 1");
   const [selectedAsset, setSelectedAsset] = useState<string>("Asset 1");
   const [technicians, setTechnicians] = useState<string[]>([]);
@@ -221,12 +222,27 @@ export default function VisualAnalysis() {
           <p className="text-muted-foreground">Consolidação de toda a análise visual e comparativa do sistema</p>
         </div>
 
-        <Tabs defaultValue="planejamento" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="planejamento">Planejamento</TabsTrigger>
-            <TabsTrigger value="desempenho">Desempenho</TabsTrigger>
-            <TabsTrigger value="historico">Histórico do Ativo</TabsTrigger>
-            <TabsTrigger value="oss">Ordens de Serviço</TabsTrigger>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          {/* Mobile: dropdown */}
+          <div className="sm:hidden mb-3">
+            <select
+              value={activeTab}
+              onChange={(e) => setActiveTab(e.target.value)}
+              className="w-full border rounded px-3 py-2 bg-white"
+            >
+              <option value="planejamento">Planejamento</option>
+              <option value="desempenho">Desempenho</option>
+              <option value="historico">Histórico do Ativo</option>
+              <option value="oss">Ordens de Serviço</option>
+            </select>
+          </div>
+
+          {/* Desktop: tabs */}
+          <TabsList className="hidden sm:flex w-full flex-wrap sm:flex-nowrap gap-2">
+            <TabsTrigger value="planejamento" className="w-full sm:w-1/4 text-center py-2">Planejamento</TabsTrigger>
+            <TabsTrigger value="desempenho" className="w-full sm:w-1/4 text-center py-2">Desempenho</TabsTrigger>
+            <TabsTrigger value="historico" className="w-full sm:w-1/4 text-center py-2">Histórico do Ativo</TabsTrigger>
+            <TabsTrigger value="oss" className="w-full sm:w-1/4 text-center py-2">Ordens de Serviço</TabsTrigger>
           </TabsList>
 
           {/* PLANEJAMENTO */}

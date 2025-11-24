@@ -1,6 +1,16 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar, Package, CheckCircle, DollarSign, Clock } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { Layout } from "@/components/Layout";
+import { useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -13,9 +23,14 @@ export default function Dashboard() {
   const [ordersTotal, setOrdersTotal] = useState<number>(0);
   const [ordersCompleted, setOrdersCompleted] = useState<number>(0);
   const [totalCost, setTotalCost] = useState<number>(0);
-  const [upcomingThisMonth, setUpcomingThisMonth] = useState<Array<{ date: string; asset_code: string }>>([]);
+  const [upcomingThisMonth, setUpcomingThisMonth] = useState<any[]>([]);
   const [upcoming7Days, setUpcoming7Days] = useState<Array<{ date: string; asset_code: string; daysUntil: number; order_number?: string; status?: string }>>([]);
   const [overdues, setOverdues] = useState<Array<{ asset_code: string; days: number }>>([]);
+  const [showDayDialog, setShowDayDialog] = useState(false);
+  const [selectedDayEntries, setSelectedDayEntries] = useState<any[]>([]);
+  const [selectedDayLabel, setSelectedDayLabel] = useState<string>("");
+  const [selectedEntry, setSelectedEntry] = useState<any | null>(null);
+  const navigate = useNavigate();
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
 
   useEffect(() => {
@@ -48,14 +63,13 @@ export default function Dashboard() {
       const end = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
       const { data: sched } = await supabase
         .from("work_orders")
-        .select("scheduled_date, assets(asset_code), order_number, status")
+        .select("id, scheduled_date, description, assets(asset_code), order_number, status")
         .gte("scheduled_date", format(start, "yyyy-MM-dd"))
         .lte("scheduled_date", format(end, "yyyy-MM-dd"))
         .in("status", ["pendente", "em_andamento"])
         .order("scheduled_date", { ascending: true });
-      setUpcomingThisMonth(
-        (sched || []).map((s: any) => ({ date: s.scheduled_date, asset_code: s.assets?.asset_code }))
-      );
+      // keep full records for the month to display in dialog per day
+      setUpcomingThisMonth(sched || []);
 
       // Próximas 7 dias (Alertas reais)
       const today = new Date();
@@ -179,6 +193,72 @@ export default function Dashboard() {
           })}
         </div>
 
+        {/* Dialog: Manutenções do Dia */}
+        <Dialog open={showDayDialog} onOpenChange={setShowDayDialog}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Manutenções — {selectedDayLabel}</DialogTitle>
+              <DialogDescription>
+                Lista de ordens de serviço agendadas para o dia selecionado.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              {selectedDayEntries.length === 0 ? (
+                <div className="text-sm text-muted-foreground">Nenhuma manutenção encontrada.</div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="col-span-1">
+                    <ul className="space-y-2 max-h-96 overflow-auto">
+                      {selectedDayEntries.map((e: any) => (
+                        <li key={e.id}>
+                          <button
+                            onClick={() => setSelectedEntry(e)}
+                            className={`w-full text-left px-3 py-2 rounded border hover:bg-slate-50 ${selectedEntry?.id === e.id ? 'bg-slate-100 border-slate-300' : ''}`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="text-sm font-medium">{e.order_number || '—'}</div>
+                              <div className="text-xs text-muted-foreground">{e.status}</div>
+                            </div>
+                            <div className="text-xs text-muted-foreground">{e.assets?.asset_code || '—'}</div>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="col-span-2">
+                    {selectedEntry ? (
+                      <Card className="p-3">
+                        <CardHeader>
+                          <CardTitle className="flex items-center justify-between">
+                            <span>{selectedEntry.order_number || 'Sem número'}</span>
+                            <span className="text-xs text-muted-foreground">{selectedEntry.scheduled_date}</span>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="mb-2">
+                            <div className="text-sm font-medium">Ativo: {selectedEntry.assets?.asset_code || '—'}</div>
+                            <div className="text-xs text-muted-foreground">Status: {selectedEntry.status}</div>
+                          </div>
+                          <div className="text-sm text-slate-600">{selectedEntry.description || 'Sem descrição'}</div>
+                          <div className="mt-4 flex gap-2">
+                            <Button onClick={() => { setShowDayDialog(false); navigate('/ordens'); }}>Abrir lista de OS</Button>
+                            <Button variant="outline" onClick={() => setSelectedEntry(null)}>Selecionar outro</Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <div className="text-sm text-muted-foreground">Selecione uma manutenção para ver detalhes.</div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowDayDialog(false)}>Fechar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Calendário de Manutenções */}
           <Card className="col-span-2">
@@ -196,20 +276,49 @@ export default function Dashboard() {
             <CardContent>
               <div className="grid grid-cols-7 gap-2">
                 {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => {
-                  const entriesForDay = upcomingThisMonth.filter((u) => new Date(u.date).getDate() === day);
-                  const label = entriesForDay.length > 0 ? entriesForDay[0].asset_code : null;
+                  const entriesForDay = upcomingThisMonth.filter((u) => new Date(u.scheduled_date).getDate() === day);
+                  const label = entriesForDay.length > 0 ? entriesForDay[0].assets?.asset_code || entriesForDay[0].asset_code : null;
                   const moreCount = entriesForDay.length > 1 ? entriesForDay.length - 1 : 0;
+
+                  // compute color priority: red if any past, green if any within 7 days, else yellow
+                  const today = new Date();
+                  let dayState: "red" | "green" | "yellow" | "none" = "none";
+                  if (entriesForDay.length > 0) {
+                    const diffs = entriesForDay.map((u) => Math.ceil((new Date(u.scheduled_date).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)));
+                    if (diffs.some((d) => d < 0)) {
+                      dayState = "red";
+                    } else if (diffs.some((d) => d <= 7)) {
+                      dayState = "green";
+                    } else {
+                      dayState = "yellow";
+                    }
+                  }
+
+                  const bgClass =
+                    dayState === "green" ? "bg-green-100 border-green-300 text-green-800" :
+                    dayState === "yellow" ? "bg-yellow-100 border-yellow-300 text-yellow-800" :
+                    dayState === "red" ? "bg-red-100 border-red-300 text-red-800" :
+                    "bg-white";
+
                   return (
                     <div key={day} className="border rounded-lg h-12 flex flex-col items-center justify-center">
                       <span className="text-xs text-muted-foreground">{day}</span>
-                      {label && (
+                      {label ? (
                         <div className="flex items-center gap-1 mt-1">
-                          <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs font-medium">{label}</span>
-                          {moreCount > 0 && (
-                            <span className="text-xs text-slate-500">+{moreCount}</span>
-                          )}
+                          <button
+                            onClick={() => {
+                              setSelectedDayEntries(entriesForDay);
+                              setSelectedDayLabel(`${format(currentMonth, "MMMM yyyy")} • Dia ${day}`);
+                              setShowDayDialog(true);
+                            }}
+                            title={`${entriesForDay.length} manutenção(ões)`}
+                            className={`inline-flex items-center justify-center h-6 w-6 rounded-full text-xs font-bold border ${bgClass}`}
+                          >
+                            M
+                          </button>
+                          {moreCount > 0 && <span className="text-[10px] text-slate-500">+{moreCount}</span>}
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   );
                 })}
