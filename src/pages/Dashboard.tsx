@@ -14,6 +14,7 @@ import { useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { MaintenanceTrendChart } from "@/components/charts/MaintenanceTrendChart";
 import { AssetStatusChart } from "@/components/charts/AssetStatusChart";
 
@@ -269,7 +270,7 @@ export default function Dashboard() {
               </CardTitle>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <button onClick={goPrevMonth} className="px-2 py-1 border rounded">←</button>
-                <span className="min-w-[120px] text-center">{format(currentMonth, "MMMM yyyy")}</span>
+                <span className="min-w-[120px] text-center">{format(currentMonth, "MMMM yyyy", { locale: ptBR })}</span>
                 <button onClick={goNextMonth} className="px-2 py-1 border rounded">→</button>
               </div>
             </CardHeader>
@@ -308,7 +309,7 @@ export default function Dashboard() {
                           <button
                             onClick={() => {
                               setSelectedDayEntries(entriesForDay);
-                              setSelectedDayLabel(`${format(currentMonth, "MMMM yyyy")} • Dia ${day}`);
+                              setSelectedDayLabel(`${format(currentMonth, "MMMM yyyy", { locale: ptBR })} • Dia ${day}`);
                               setShowDayDialog(true);
                             }}
                             title={`${entriesForDay.length} manutenção(ões)`}
