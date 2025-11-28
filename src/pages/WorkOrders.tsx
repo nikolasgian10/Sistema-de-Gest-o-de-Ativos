@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Search, Filter, FileText } from "lucide-react";
+import { Plus, Search, Filter, FileText, Trash } from "lucide-react";
 import FormularioOS from "@/components/os/FormularioOS";
 import { Download } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -244,6 +244,20 @@ export default function WorkOrders() {
     }
   };
 
+  const handleDeleteOrder = async (id: string) => {
+    try {
+      const ok = window.confirm('Confirma exclusão desta Ordem de Serviço? Esta ação não pode ser desfeita.');
+      if (!ok) return;
+      const { error } = await supabase.from('work_orders').delete().eq('id', id);
+      if (error) throw error;
+      toast.success('Ordem de serviço excluída com sucesso');
+      await fetchWorkOrders();
+    } catch (err: any) {
+      console.error('Erro ao excluir ordem:', err);
+      toast.error(err?.message || 'Erro ao excluir ordem. Verifique permissões.');
+    }
+  };
+
   return (
     <Layout>
       <div className="p-6 space-y-6">
@@ -425,9 +439,15 @@ export default function WorkOrders() {
                       <p className="text-lg font-bold text-primary">
                         {format(new Date(order.scheduled_date), "dd 'de' MMMM, yyyy", { locale: ptBR })}
                       </p>
-                      <Button variant="outline" size="sm">
-                        Ver Detalhes
-                      </Button>
+                      <div className="flex gap-2 justify-end">
+                        <Button variant="outline" size="sm" onClick={() => navigate(`/ordens/${order.id}`)}>
+                          Ver Detalhes
+                        </Button>
+                        <Button variant="destructive" size="sm" onClick={() => handleDeleteOrder(order.id)}>
+                          <Trash className="h-4 w-4 mr-2" />
+                          Excluir
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </CardContent>
