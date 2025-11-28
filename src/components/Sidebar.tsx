@@ -262,11 +262,11 @@ export function Sidebar() {
                 </>
               )}
 
-              {/* Menus para gestor: tudo do menuItems, exceto Gerenciamento de Usuários */}
+              {/* Menus para gestor: apenas Gerenciamento de Usuários e excludente Configurações */}
               {profile?.role === "gestor" && (
                 <>
                   {menuItems.map((item) => (
-                    item.title !== "Gerenciamento de Usuários" && (
+                    item.title !== "Configurações" && (
                       <SidebarMenuItem key={item.title}>
                         <TooltipProvider>
                           <Tooltip>
@@ -296,6 +296,32 @@ export function Sidebar() {
                       </SidebarMenuItem>
                     )
                   ))}
+                  <SidebarMenuItem key="Gerenciamento de Usuários">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <SidebarMenuButton asChild>
+                            <NavLink
+                              to="/admin/users"
+                              className={({ isActive }) =>
+                                isActive
+                                  ? "flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-50 text-blue-700 font-medium transition-all duration-200 mb-1 whitespace-normal"
+                                  : "flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 text-slate-700 mb-1 whitespace-normal"
+                              }
+                            >
+                              <Users className="h-5 w-5 flex-shrink-0" />
+                              {!isCollapsed && <span className="font-medium whitespace-normal">Gerenciamento de Usuários</span>}
+                            </NavLink>
+                          </SidebarMenuButton>
+                        </TooltipTrigger>
+                        {isCollapsed && (
+                          <TooltipContent side="right">
+                            <p>Gerenciamento de Usuários</p>
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+                    </TooltipProvider>
+                  </SidebarMenuItem>
                 </>
               )}
 

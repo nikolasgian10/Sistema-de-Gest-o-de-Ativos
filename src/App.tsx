@@ -111,6 +111,57 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function AdminOrGestorRoute({ children }: { children: React.ReactNode }) {
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isAuthorized, setIsAuthorized] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
+      if (session?.user) {
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", session.user.id).single();
+        setIsAuthorized(profile?.role === "admin" || profile?.role === "gestor");
+      }
+      setLoading(false);
+    })();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      setSession(session);
+      if (session?.user) {
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", session.user.id).single();
+        setIsAuthorized(profile?.role === "admin" || profile?.role === "gestor");
+      } else {
+        setIsAuthorized(false);
+      }
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  if (!isAuthorized) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -178,9 +229,9 @@ const App = () => (
           <Route
             path="/admin/users"
             element={
-              <AdminRoute>
+              <AdminOrGestorRoute>
                 <AdminUsers />
-              </AdminRoute>
+              </AdminOrGestorRoute>
             }
           />
           <Route
