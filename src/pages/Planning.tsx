@@ -148,7 +148,6 @@ interface WorkOrder {
   asset_id: string;
   status: string;
   scheduled_date?: string;
-  data_prevista?: string;
 }
 
 interface StatusSemana {
@@ -329,10 +328,10 @@ export default function Planning() {
       if (error) throw error;
       return data as WorkOrder[];
     },
-    staleTime: 2 * 60 * 1000, // Cache por 2 minutos
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    refetchOnReconnect: false,
+    staleTime: 0, // Considerar sempre stale para atualizar rapidamente
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    refetchOnReconnect: true,
   });
 
   // Memoize weeks of year
@@ -561,9 +560,7 @@ export default function Planning() {
                 status: "pendente",
                 priority: prioridade,
                 scheduled_date: dataPrevista,
-                data_prevista: dataPrevista,
                 description: `Manutenção ${tipoManutencao} - Semana ${semanaIdx + 1}/${anoSelecionado}`,
-                observacoes: `Plano Sistemático ${anoSelecionado} - ${predio}`,
               });
             }
           });
@@ -586,11 +583,17 @@ export default function Planning() {
 
       return totalGeradas;
     },
-    onSuccess: (count) => {
+    onSuccess: async (count) => {
       toast.success(`✅ ${count} Ordens de Serviço geradas com sucesso!`);
       setSemanasParaGerar([]);
-      // Invalidate apenas a query específica do ano
-      queryClient.invalidateQueries({ queryKey: ["work_orders", anoSelecionado] });
+      
+      // Atualizar cache manualmente
+      const existingWorkOrders = queryClient.getQueryData<WorkOrder[]>(["work_orders", anoSelecionado]) || [];
+      const currentData = [...existingWorkOrders]; // Fazer cópia para triggerar re-render
+      queryClient.setQueryData(["work_orders", anoSelecionado], currentData);
+      
+      // Depois refetch para sincronizar com o banco
+      await queryClient.refetchQueries({ queryKey: ["work_orders", anoSelecionado] });
     },
     onError: (error: Error) => {
       if (error.message.includes("já foram geradas")) {
@@ -623,17 +626,29 @@ export default function Planning() {
       status: "pendente",
       priority: prioridade,
       scheduled_date: dataPrevista,
-      data_prevista: dataPrevista,
       description: `Manutenção ${tipoManutencao} - Semana ${semanaIdx + 1}/${anoSelecionado}`,
-      observacoes: `Plano Sistemático ${anoSelecionado} - ${predio}`,
     });
 
     if (error) {
       toast.error("Erro ao gerar OS: " + error.message);
     } else {
       toast.success(`OS gerada para ${ativo.asset_code}`);
-      // Invalidate apenas a query específica do ano
-      queryClient.invalidateQueries({ queryKey: ["work_orders", anoSelecionado] });
+      
+      // Atualizar cache manualmente adicionando a nova OS aos dados existentes
+      const existingWorkOrders = queryClient.getQueryData<WorkOrder[]>(["work_orders", anoSelecionado]) || [];
+      const newWorkOrder: WorkOrder = {
+        id: `temp_${Date.now()}`,
+        order_number: `OS-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+        asset_id: ativo.id,
+        status: "pendente",
+        scheduled_date: dataPrevista,
+      };
+      
+      // Atualizar o cache imediatamente com a nova OS
+      queryClient.setQueryData(["work_orders", anoSelecionado], [...existingWorkOrders, newWorkOrder]);
+      
+      // Depois refetch para sincronizar com o banco
+      queryClient.refetchQueries({ queryKey: ["work_orders", anoSelecionado] });
     }
   }, [getProgramacao, workOrdersMap, semanasDoAno, anoSelecionado, queryClient]);
 
@@ -915,9 +930,7 @@ export default function Planning() {
         status: 'pendente',
         priority: item.priority || 'media',
         scheduled_date: item.scheduled_date,
-        data_prevista: item.scheduled_date,
         description: item.description || `Manutenção preventiva - ${item.asset_code}`,
-        observacoes: `Importado via Excel - ${format(new Date(), 'dd/MM/yyyy')}`,
       }));
 
       // Insert in batches
@@ -933,13 +946,19 @@ export default function Planning() {
 
       return totalCriadas;
     },
-    onSuccess: (count) => {
+    onSuccess: async (count) => {
       toast.success(`✅ ${count} Ordens de Serviço criadas com sucesso!`);
       setMostrarDialogImportar(false);
       setDadosImportados([]);
       setEditandoDados([]);
-      // Invalidate apenas a query específica do ano
-      queryClient.invalidateQueries({ queryKey: ["work_orders", anoSelecionado] });
+      
+      // Atualizar cache manualmente
+      const existingWorkOrders = queryClient.getQueryData<WorkOrder[]>(["work_orders", anoSelecionado]) || [];
+      const currentData = [...existingWorkOrders]; // Fazer cópia para triggerar re-render
+      queryClient.setQueryData(["work_orders", anoSelecionado], currentData);
+      
+      // Depois refetch para sincronizar com o banco
+      await queryClient.refetchQueries({ queryKey: ["work_orders", anoSelecionado] });
     },
     onError: (error: Error) => {
       toast.error("Erro ao criar OSs: " + error.message);
