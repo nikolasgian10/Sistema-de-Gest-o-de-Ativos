@@ -234,6 +234,8 @@ export default function Planning() {
   const [semanasSelecionadas, setSemanasSelecionadas] = useState<number[]>([]);
   const [semanasSemestrais, setSemanasSemestrais] = useState<number[]>([]);
   const [observacoes, setObservacoes] = useState("");
+  const [aplicarEm, setAplicarEm] = useState<'predio' | 'ativo'>('predio');
+  const [ativoSelecionado, setAtivoSelecionado] = useState<string | null>(null);
   const [mostrarDialogImportar, setMostrarDialogImportar] = useState(false);
   const [dadosImportados, setDadosImportados] = useState<any[]>([]);
   const [editandoDados, setEditandoDados] = useState<any[]>([]);
@@ -699,6 +701,39 @@ export default function Planning() {
 
       const supabaseClient = supabase as any;
       try {
+        // If applying to a single asset, create maintenance_schedule entries instead
+        if (aplicarEm === 'ativo') {
+          if (!ativoSelecionado) {
+            throw new Error('Selecione um equipamento para aplicar a programação');
+          }
+
+          // Build inserts for each selected week
+          const inserts: any[] = semanasSelecionadas.map((semIdx) => {
+            const isSemestral = semanasSemestrais.includes(semIdx);
+            const nextMaintenance = semanasDoAno[semIdx];
+            return {
+              asset_id: ativoSelecionado,
+              schedule_type: isSemestral ? 'semestral' : 'mensal',
+              frequency_months: isSemestral ? 6 : 1,
+              last_maintenance: null,
+              next_maintenance: format(nextMaintenance, 'yyyy-MM-dd'),
+              created_by: user?.email || null,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            };
+          });
+
+          // Insert in batch, ignoring duplicates if any
+          for (let i = 0; i < inserts.length; i += 50) {
+            const chunk = inserts.slice(i, i + 50);
+            const { error } = await supabaseClient.from('maintenance_schedule').insert(chunk);
+            if (error) throw error;
+          }
+
+          return;
+        }
+
+        // Default: apply to whole building via programacao_manutencao
         if (progExistente) {
           await supabaseClient
             .from("programacao_manutencao")
@@ -751,6 +786,11 @@ export default function Planning() {
       toast.success(`✅ Programação salva para ${localEmEdicao}!`);
       setMostrarDialogProgramacao(false);
       queryClient.invalidateQueries({ queryKey: ["programacoes"] });
+      queryClient.invalidateQueries({ queryKey: ["maintenance_schedule"] });
+      queryClient.invalidateQueries({ queryKey: ["work_orders", anoSelecionado] });
+      // reset aplicacao target
+      setAplicarEm('predio');
+      setAtivoSelecionado(null);
     },
     onError: (error: Error) => {
       toast.error("Erro ao salvar: " + error.message);
@@ -1491,6 +1531,29 @@ export default function Planning() {
               As outras 10 serão mensais (manutenções rápidas). Todos os equipamentos deste prédio seguirão esta programação.
             </DialogDescription>
           </DialogHeader>
+          <div className="px-4">
+            <div className="flex items-center gap-4 mb-4">
+              <label className="flex items-center gap-2">
+                <input type="radio" name="aplicarEm" checked={aplicarEm === 'predio'} onChange={() => { setAplicarEm('predio'); setAtivoSelecionado(null); }} />
+                <span className="text-sm">Aplicar a todos os equipamentos do prédio</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="radio" name="aplicarEm" checked={aplicarEm === 'ativo'} onChange={() => setAplicarEm('ativo')} />
+                <span className="text-sm">Aplicar somente a um equipamento</span>
+              </label>
+            </div>
+            {aplicarEm === 'ativo' && (
+              <div className="mb-4">
+                <p className="text-sm font-medium mb-2">Escolha o equipamento:</p>
+                <select className="w-full p-2 border rounded" value={ativoSelecionado || ''} onChange={(e) => setAtivoSelecionado(e.target.value || null)}>
+                  <option value="">-- Selecione um equipamento --</option>
+                  {(ativosPorPredio[localEmEdicao] || []).map((a) => (
+                    <option key={a.id} value={a.id}>{a.asset_code} — {a.brand || ''} {a.model || ''}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
           <div className="space-y-4">
             <div className="grid gap-2 overflow-x-auto" style={{ gridTemplateColumns: 'repeat(52, minmax(100px, 1fr))' }}>
               {semanasDoAno.map((semana, idx) => {
