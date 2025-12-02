@@ -83,17 +83,16 @@ export default function TechMobile() {
 			return (data as any[]) || [];
 		} });
 
-			const { data: checklists = [] } = useQuery<any[], Error>({ queryKey: ['checklists'], queryFn: async () => {
-				try {
-					// Use a dynamic cast to avoid strict Supabase typed schema issues in this repo.
-					const { data } = await (supabase as any).from('checklist_templates').select('*');
-					return (data as any[]) || [];
-				} catch (err) {
-					return [];
-				}
-			} });
-
-			const updateAtivoMutation = useMutation({
+		const { data: checklists = [] } = useQuery<any[], Error>({ queryKey: ['checklists'], queryFn: async () => {
+			try {
+				// Fetch all asset checklists
+				const { data } = await supabase.from('asset_checklists').select('*');
+				return (data as any[]) || [];
+			} catch (err) {
+				console.error('Erro ao carregar checklists:', err);
+				return [];
+			}
+		} });			const updateAtivoMutation = useMutation({
 				mutationFn: async ({ id, data }: any) => {
 					return await supabase.from('assets').update(data).eq('id', id);
 				},
@@ -290,8 +289,27 @@ export default function TechMobile() {
 	};
 
 	const obterChecklistDoAtivo = (ativo: any, tipoManutencao: string) => {
-		// 1. Tenta buscar do localStorage primeiro (checklists criados no sistema)
+		// 1. Busca checklist específico do ativo no banco de dados (asset_checklists)
 		if (ativo?.id) {
+			const checklistFromDb = (checklists as any[]).find(c => c.asset_id === ativo.id);
+			if (checklistFromDb && checklistFromDb.items?.length > 0) {
+				// Converte o formato do banco para o formato esperado pelo ChecklistExecucao
+				return {
+					id: checklistFromDb.id,
+					name: checklistFromDb.name,
+					nome: checklistFromDb.name,
+					itens: checklistFromDb.items.map((item: any) => ({
+						id: item.id || Math.random().toString(),
+						label: item.label || item.text || '',
+						title: item.label || item.text || '',
+						text: item.label || item.text || '',
+						type: item.type || 'verificacao'
+					})),
+					items: checklistFromDb.items
+				};
+			}
+
+			// 2. Fallback para localStorage (checklists antigos)
 			try {
 				const stored = localStorage.getItem(`checklist_${ativo.id}`);
 				if (stored) {
@@ -318,17 +336,10 @@ export default function TechMobile() {
 			}
 		}
 
-		// 2. Busca checklist personalizado do ativo
+		// 3. Busca checklist personalizado do ativo (se existir campo no assets table)
 		if (ativo?.checklist_personalizado && ativo.checklist_personalizado.itens?.length > 0) return ativo.checklist_personalizado;
 		
-		// 3. Busca por template_id
-		if (ativo?.checklist_template_id) {
-			const template = (checklists as any[]).find(c => c.id === ativo.checklist_template_id);
-			if (template) return template;
-		}
-		
-		// 4. Busca por tipo de ativo
-		return (checklists as any[]).find(c => c.tipo_ativo === ativo.tipo_ativo) || null;
+		return null;
 	};
 
 	const handleIniciarOS = async (os: any) => {
