@@ -172,7 +172,11 @@ function createWorkOrdersMap(workOrders: WorkOrder[], semanasDoAno: Date[]): Map
   const map = new Map<string, WorkOrder>();
   workOrders.forEach((wo) => {
     if (wo.scheduled_date && wo.asset_id) {
-      const woDate = format(new Date(wo.scheduled_date), "yyyy-MM-dd");
+      // Garantir que scheduled_date é comparado corretamente (sempre em formato yyyy-MM-dd)
+      const woDate = typeof wo.scheduled_date === 'string' 
+        ? wo.scheduled_date.split('T')[0] // Se vier como ISO, pegar só a data
+        : format(new Date(wo.scheduled_date), "yyyy-MM-dd");
+      
       semanasDoAno.forEach((semana, idx) => {
         const semanaDate = format(semana, "yyyy-MM-dd");
         if (woDate === semanaDate) {
@@ -182,6 +186,8 @@ function createWorkOrdersMap(workOrders: WorkOrder[], semanasDoAno: Date[]): Map
       });
     }
   });
+  
+  console.log("WorkOrdersMap updated with", map.size, "entries from", workOrders.length, "work orders");
   return map;
 }
 
@@ -587,13 +593,13 @@ export default function Planning() {
       toast.success(`✅ ${count} Ordens de Serviço geradas com sucesso!`);
       setSemanasParaGerar([]);
       
-      // Atualizar cache manualmente
-      const existingWorkOrders = queryClient.getQueryData<WorkOrder[]>(["work_orders", anoSelecionado]) || [];
-      const currentData = [...existingWorkOrders]; // Fazer cópia para triggerar re-render
-      queryClient.setQueryData(["work_orders", anoSelecionado], currentData);
-      
-      // Depois refetch para sincronizar com o banco
-      await queryClient.refetchQueries({ queryKey: ["work_orders", anoSelecionado] });
+      // Refetch work orders para sincronizar com o banco
+      console.log("Refetching work orders after bulk generation");
+      await queryClient.refetchQueries({ 
+        queryKey: ["work_orders", anoSelecionado],
+        type: 'active',
+        exact: true
+      });
     },
     onError: (error: Error) => {
       if (error.message.includes("já foram geradas")) {
@@ -634,21 +640,13 @@ export default function Planning() {
     } else {
       toast.success(`OS gerada para ${ativo.asset_code}`);
       
-      // Atualizar cache manualmente adicionando a nova OS aos dados existentes
-      const existingWorkOrders = queryClient.getQueryData<WorkOrder[]>(["work_orders", anoSelecionado]) || [];
-      const newWorkOrder: WorkOrder = {
-        id: `temp_${Date.now()}`,
-        order_number: `OS-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
-        asset_id: ativo.id,
-        status: "pendente",
-        scheduled_date: dataPrevista,
-      };
-      
-      // Atualizar o cache imediatamente com a nova OS
-      queryClient.setQueryData(["work_orders", anoSelecionado], [...existingWorkOrders, newWorkOrder]);
-      
-      // Depois refetch para sincronizar com o banco
-      queryClient.refetchQueries({ queryKey: ["work_orders", anoSelecionado] });
+      // Refetch work orders para trazer a nova OS criada
+      console.log("Refetching work orders after OS creation");
+      await queryClient.refetchQueries({ 
+        queryKey: ["work_orders", anoSelecionado],
+        type: 'active',
+        exact: true
+      });
     }
   }, [getProgramacao, workOrdersMap, semanasDoAno, anoSelecionado, queryClient]);
 
@@ -952,13 +950,13 @@ export default function Planning() {
       setDadosImportados([]);
       setEditandoDados([]);
       
-      // Atualizar cache manualmente
-      const existingWorkOrders = queryClient.getQueryData<WorkOrder[]>(["work_orders", anoSelecionado]) || [];
-      const currentData = [...existingWorkOrders]; // Fazer cópia para triggerar re-render
-      queryClient.setQueryData(["work_orders", anoSelecionado], currentData);
-      
-      // Depois refetch para sincronizar com o banco
-      await queryClient.refetchQueries({ queryKey: ["work_orders", anoSelecionado] });
+      // Refetch work orders para sincronizar com o banco
+      console.log("Refetching work orders after import");
+      await queryClient.refetchQueries({ 
+        queryKey: ["work_orders", anoSelecionado],
+        type: 'active',
+        exact: true
+      });
     },
     onError: (error: Error) => {
       toast.error("Erro ao criar OSs: " + error.message);
