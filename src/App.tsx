@@ -11,6 +11,7 @@ import Dashboard from "./pages/Dashboard";
 import Assets from "./pages/Assets";
 import AssetDetail from "./pages/AssetDetail";
 import WorkOrders from "./pages/WorkOrders";
+import WorkOrderDetail from "./pages/WorkOrderDetail";
 import Planning from "./pages/Planning";
 import Inventory from "./pages/Inventory";
 import Reports from "./pages/Reports";
@@ -19,6 +20,7 @@ import VisualAnalysis from "./pages/VisualAnalysis";
 import AdminUsers from "./pages/AdminUsers";
 import TechMobile from "./pages/TechMobile";
 import HistoricoAtivo from "./pages/HistoricoAtivo";
+import TestPhotoUpload from "./pages/TestPhotoUpload";
 import GestaoPecas from "./pages/GestaoPecas";
 import Settings from "./pages/Settings";
 import SeedData from "./pages/SeedData";
@@ -203,6 +205,14 @@ const App = () => (
             }
           />
           <Route
+            path="/ordens/:id"
+            element={
+              <ProtectedRoute>
+                <WorkOrderDetail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/planejamento"
             element={
               <ProtectedRoute>
@@ -263,6 +273,14 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <HistoricoAtivo />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/test-photo-upload"
+            element={
+              <ProtectedRoute>
+                <TestPhotoUpload />
               </ProtectedRoute>
             }
           />

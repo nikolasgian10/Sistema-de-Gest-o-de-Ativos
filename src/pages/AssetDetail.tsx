@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import FormularioCadastro from "@/components/ativos/FormularioCadastro";
-import { ArrowLeft, Edit, Package, Trash2 } from "lucide-react";
+import { ArrowLeft, Edit, Package, Trash2, History } from "lucide-react";
 import { toast } from "sonner";
 import AssetChecklistEditor from "@/components/ativos/AssetChecklistEditor";
 import { generateAssetCode, isUniqueViolation } from "@/lib/utils";
@@ -368,6 +368,14 @@ export default function AssetDetail() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <Button 
+              onClick={() => navigate(`/historico/${asset.id}`)} 
+              variant="outline" 
+              className="gap-2"
+            >
+              <History className="h-4 w-4" />
+              Histórico
+            </Button>
             <Button onClick={() => setIsEditing(true)} variant="outline" className="gap-2">
               <Edit className="h-4 w-4" />
               Editar

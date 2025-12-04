@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle, Camera, ArrowLeft } from 'lucide-react';
+import { CheckCircle, Camera, ArrowLeft, X, ExternalLink, Download } from 'lucide-react';
 
 type ChecklistExecucaoProps = {
   checklist: any;
@@ -17,6 +18,7 @@ export default function ChecklistExecucao({ checklist, ativo, onSalvar, onVoltar
   const [respostas, setRespostas] = useState<any[]>([]);
   const [observacoes, setObservacoes] = useState('');
   const [fotos, setFotos] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<string[]>([]);
 
   useEffect(() => {
     // initialize respostas with default values
@@ -33,17 +35,63 @@ export default function ChecklistExecucao({ checklist, ativo, onSalvar, onVoltar
 
   const handleFotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
-    setFotos((prev) => [...prev, ...Array.from(e.target.files)]);
+    const files = Array.from(e.target.files);
+    setFotos((prev) => [...prev, ...files]);
+    const urls = files.map((f) => URL.createObjectURL(f));
+    setPreviews((prev) => [...prev, ...urls]);
   };
 
-  const handleSalvar = () => {
+  const handleSalvar = async () => {
+    // Upload photos to Supabase Storage and collect public URLs
+    const uploadedUrls: string[] = [];
+
+    if (fotos.length > 0) {
+      for (const file of fotos) {
+        try {
+          const filePath = `checklist-photos/${ativo?.id || 'anonymous'}/${Date.now()}_${file.name}`;
+          const { data, error: uploadError } = await supabase.storage.from('checklist-photos').upload(filePath, file, { upsert: false });
+          if (uploadError) {
+            console.error('Erro ao enviar foto:', uploadError);
+            continue;
+          }
+
+          const { data: publicData } = supabase.storage.from('checklist-photos').getPublicUrl(filePath);
+          if (publicData?.publicUrl) {
+            uploadedUrls.push(publicData.publicUrl);
+          }
+        } catch (err) {
+          console.error('Erro no upload da foto:', err);
+        }
+      }
+    }
+
     const dados = {
       respostas,
       observacoes_gerais: observacoes,
-      fotos: fotos.map((f) => f.name),
+      fotos: uploadedUrls,
       timestamp: new Date().toISOString(),
     };
+
+    // cleanup local previews
+    previews.forEach((u) => URL.revokeObjectURL(u));
+    setPreviews([]);
+    setFotos([]);
+
     onSalvar(dados);
+  };
+
+  const removePreview = (idx: number) => {
+    setPreviews((prev) => {
+      const copy = [...prev];
+      const [removed] = copy.splice(idx, 1);
+      if (removed) URL.revokeObjectURL(removed);
+      return copy;
+    });
+    setFotos((prev) => {
+      const copy = [...prev];
+      copy.splice(idx, 1);
+      return copy;
+    });
   };
 
   return (
@@ -95,6 +143,19 @@ export default function ChecklistExecucao({ checklist, ativo, onSalvar, onVoltar
                 </label>
                 <div className="text-sm text-muted-foreground">{fotos.length} foto(s) selecionada(s)</div>
               </div>
+
+              {previews.length > 0 && (
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  {previews.map((src, idx) => (
+                    <div key={idx} className="relative border rounded overflow-hidden">
+                      <img src={src} alt={`preview ${idx+1}`} className="w-full h-24 object-cover" />
+                      <button type="button" onClick={() => removePreview(idx)} className="absolute top-1 right-1 bg-white rounded-full p-1 shadow">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="flex gap-2 mt-4">
