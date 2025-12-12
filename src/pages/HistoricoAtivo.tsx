@@ -120,30 +120,27 @@ export default function HistoricoAtivo() {
     
     // Mostrar modal imediatamente com dados básicos
     setSelectedItem(item);
-    
-    // Depois carregar dados adicionais em background
     setDetailsLoading(true);
     
     try {
       const detail: MaintenanceDetail = { ...item };
 
-      // Fetch work order details if available
+      // Se o item já tem fotos, usa elas direto
+      if (item.photos && Array.isArray(item.photos) && item.photos.length > 0) {
+        console.log("📸 Item já tem fotos:", item.photos);
+        detail.photos = item.photos;
+      }
+
+      // Se tem work_order_id, carrega dados adicionais
       if (item.workOrderId) {
-        console.log("📋 Carregando OS com ID:", item.workOrderId);
-        
-        const { data: osData, error: osError } = await supabase
+        const { data: osData } = await supabase
           .from("work_orders")
-          .select("id, order_number, order_type, notes, assigned_to, completed_date")
+          .select("id, order_number, order_type, notes, assigned_to")
           .eq("id", item.workOrderId)
           .single();
 
-        if (osError) {
-          console.error("❌ Erro ao carregar OS:", osError);
-        } else if (osData) {
-          console.log("✅ OS carregada:", osData);
+        if (osData) {
           detail.notes = osData.notes;
-          
-          // Fetch technician name
           if (osData.assigned_to) {
             const { data: techData } = await supabase
               .from("profiles")
@@ -151,87 +148,54 @@ export default function HistoricoAtivo() {
               .eq("id", osData.assigned_to)
               .single();
             detail.technicianName = techData?.full_name;
-            console.log("👤 Técnico:", detail.technicianName);
           }
         }
 
-        // Fetch asset_history to get checklist responses and photos
-        const { data: historyData, error: histError } = await supabase
+        // Tenta carregar mais fotos de asset_history se existirem
+        const { data: historyData } = await supabase
           .from("asset_history")
           .select("*")
-          .eq("work_order_id", item.workOrderId);
+          .eq("work_order_id", item.workOrderId)
+          .limit(1);
 
-        if (!histError && historyData && historyData.length > 0) {
-          console.log("📝 Histórico carregado:", historyData[0]);
-          if (historyData[0]?.checklist_responses) {
-            detail.checklistResponses = historyData[0].checklist_responses;
+        if (historyData && historyData.length > 0) {
+          const hist = historyData[0];
+          console.log("📋 Histórico completo:", hist);
+          
+          if (hist.checklist_data) {
+            detail.checklist_data = hist.checklist_data;
+            console.log("✅ checklist_data carregado:", detail.checklist_data);
           }
-          // Carregar fotos do campo photos
-          if (historyData[0]?.photos && Array.isArray(historyData[0].photos)) {
-            detail.photos = historyData[0].photos;
-            console.log("📸 Fotos carregadas (raw):", detail.photos);
-
-            // Resolve to public URLs: if entry is already a URL, keep it;
-            // otherwise try to create a signed URL from the expected bucket.
-            const resolved: string[] = [];
-            for (const p of detail.photos) {
-              try {
-                if (!p) continue;
-                if (typeof p === 'string' && (p.startsWith('http://') || p.startsWith('https://'))) {
-                  resolved.push(p);
-                  continue;
-                }
-
-                // assume p is a path inside the 'checklist-photos' bucket
-                const path = typeof p === 'string' ? p : (p.path || p.name || null);
-                if (!path) continue;
-
-                const { data: signed, error: signedErr } = await supabase.storage
-                  .from('checklist-photos')
-                  .createSignedUrl(path, 60 * 60); // 1 hour
-
-                if (signedErr) {
-                  console.warn('⚠️ Erro criando signedUrl para', path, signedErr);
-                }
-
-                if (signed?.signedUrl) {
-                  resolved.push(signed.signedUrl);
-                }
-              } catch (err) {
-                console.error('Erro resolvendo foto:', err);
-              }
-            }
-
-            if (resolved.length > 0) {
-              detail.photos = resolved;
-              console.log('📸 Fotos resolvidas (signed/public):', detail.photos);
-            }
+          if (hist.checklist_responses) {
+            detail.checklistResponses = hist.checklist_responses;
+          }
+          // Se encontrou fotos no histórico e não tinha antes, usa elas
+          if (!detail.photos && hist.photos && Array.isArray(hist.photos)) {
+            detail.photos = hist.photos;
+            console.log("📸 Fotos carregadas do histórico:", detail.photos);
           }
         }
       }
 
-      // Fetch asset checklist for this work order
+      // Carregar checklist do asset
       const { data: checklistData } = await supabase
         .from("asset_checklists")
         .select("id, name, items")
-        .eq("asset_id", id)
+        .eq("asset_id", item.asset_id || id)
         .limit(1);
 
       if (checklistData && checklistData.length > 0) {
-        console.log("✅ Checklist carregado:", checklistData[0]);
         detail.checklist = checklistData[0];
       }
 
-      console.log("🎯 Detail final:", detail);
+      console.log("✅ Detail carregado:", detail);
       setSelectedItem(detail);
     } catch (error) {
-      console.error("❌ Erro ao carregar detalhes:", error);
+      console.error("❌ Erro:", error);
     } finally {
       setDetailsLoading(false);
     }
-  };
-
-  return (
+  };  return (
     <Layout>
       <div className="p-6 space-y-6">
         <div className="flex items-center justify-between">
@@ -352,10 +316,17 @@ export default function HistoricoAtivo() {
                     <h3 className="text-sm font-semibold mb-3">✅ Checklist Executado: {selectedItem.checklist.name}</h3>
                     <div className="space-y-2">
                       {selectedItem.checklist.items.map((item: any, idx: number) => {
-                        // Find the response for this item
-                        const response = selectedItem.checklistResponses?.respostas?.find(
-                          (r: any) => r.id === item.id || r.label === item.label
-                        ) || null;
+                        // Try to find response from checklist_data first (newly saved format)
+                        let response = null;
+                        if (selectedItem.checklist_data && Array.isArray(selectedItem.checklist_data)) {
+                          response = selectedItem.checklist_data[idx] || null;
+                        }
+                        // Fallback to old format
+                        if (!response && selectedItem.checklistResponses?.respostas) {
+                          response = selectedItem.checklistResponses.respostas.find(
+                            (r: any) => r.id === item.id || r.label === item.label
+                          ) || null;
+                        }
                         
                         const isOk = response?.status === 'ok';
                         

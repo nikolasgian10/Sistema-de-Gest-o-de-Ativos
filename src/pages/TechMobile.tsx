@@ -386,6 +386,10 @@ export default function TechMobile() {
 
 	const handleSalvarChecklist = async (dadosChecklist: any) => {
 		if (!ativoAtual) return;
+		
+		console.log("💾 Salvando checklist. osAtual:", osAtual);
+		console.log("📊 work_order_id que será salvo:", osAtual?.id || null);
+		
 		const checklistData = {
 			asset_id: ativoAtual.id,
 			work_order_id: osAtual?.id || null,
@@ -397,6 +401,8 @@ export default function TechMobile() {
 			signature_data: dadosChecklist.assinatura_digital || null,
 			created_at: new Date().toISOString()
 		};
+
+		console.log("🚀 checklistData completo:", checklistData);
 
 		await createChecklistRespostaMutation.mutateAsync(checklistData);
 

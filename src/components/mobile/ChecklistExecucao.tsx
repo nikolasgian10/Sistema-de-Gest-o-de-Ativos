@@ -45,22 +45,29 @@ export default function ChecklistExecucao({ checklist, ativo, onSalvar, onVoltar
     // Upload photos to Supabase Storage and collect public URLs
     const uploadedUrls: string[] = [];
 
+    console.log("📸 Iniciando upload de fotos. Total:", fotos.length);
+
     if (fotos.length > 0) {
       for (const file of fotos) {
         try {
           const filePath = `checklist-photos/${ativo?.id || 'anonymous'}/${Date.now()}_${file.name}`;
-          const { data, error: uploadError } = await supabase.storage.from('checklist-photos').upload(filePath, file, { upsert: false });
+          console.log("📤 Fazendo upload para:", filePath);
+          
+          const { data, error: uploadError } = await supabase.storage.from('photos').upload(filePath, file, { upsert: false });
           if (uploadError) {
-            console.error('Erro ao enviar foto:', uploadError);
+            console.error('❌ Erro ao enviar foto:', uploadError);
             continue;
           }
 
-          const { data: publicData } = supabase.storage.from('checklist-photos').getPublicUrl(filePath);
+          console.log("✅ Foto enviada com sucesso:", data);
+
+          const { data: publicData } = supabase.storage.from('photos').getPublicUrl(filePath);
           if (publicData?.publicUrl) {
+            console.log("🔗 URL pública gerada:", publicData.publicUrl);
             uploadedUrls.push(publicData.publicUrl);
           }
         } catch (err) {
-          console.error('Erro no upload da foto:', err);
+          console.error('❌ Erro no upload da foto:', err);
         }
       }
     }
@@ -71,6 +78,8 @@ export default function ChecklistExecucao({ checklist, ativo, onSalvar, onVoltar
       fotos: uploadedUrls,
       timestamp: new Date().toISOString(),
     };
+
+    console.log("💾 Dados finais a salvar:", dados);
 
     // cleanup local previews
     previews.forEach((u) => URL.revokeObjectURL(u));
