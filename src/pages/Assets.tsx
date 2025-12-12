@@ -4,7 +4,7 @@ import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter, Package, Download, Clock, QrCode, Pencil, Upload, FileSpreadsheet, Loader2 } from "lucide-react";
+import { Plus, Search, Filter, Package, Download, Clock, QrCode, Pencil, Upload, FileSpreadsheet, Loader2, Tags } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,7 +22,15 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { generateAssetCode, isUniqueViolation } from "@/lib/utils";
+import { generateMultipleLabels } from "@/lib/label-generator";
 
 // generateAssetCode moved to utils and imported above
 
@@ -38,6 +46,7 @@ interface Asset {
   sigla_local?: string | null;
   bem_patrimonial?: string | null;
   altura_option?: string | null;
+  sector?: string | null;
 }
 
 const statusColors: Record<string, string> = {
@@ -71,6 +80,9 @@ export default function Assets() {
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [isGeneratingLabels, setIsGeneratingLabels] = useState(false);
+  const [showLabelFilterDialog, setShowLabelFilterDialog] = useState(false);
+  const [selectedSectorForLabels, setSelectedSectorForLabels] = useState<string>('all');
 
   useEffect(() => {
     fetchAssets();
@@ -137,6 +149,40 @@ export default function Assets() {
     document.body.removeChild(link);
   };
 
+  const gerarEtiquetasEmMassa = async () => {
+    try {
+      setIsGeneratingLabels(true);
+      
+      // Filter assets by selected sector
+      let assetsToUse = filteredAssets;
+      if (selectedSectorForLabels !== 'all') {
+        assetsToUse = filteredAssets.filter(asset => asset.sector === selectedSectorForLabels);
+      }
+
+      if (assetsToUse.length === 0) {
+        toast.error('Nenhum ativo para gerar etiquetas');
+        return;
+      }
+
+      // Para cada ativo, gerar QR code e preparar dados
+      const assetsData = assetsToUse.map(asset => ({
+        id: asset.id,
+        asset_code: asset.asset_code,
+        // Use external QR provider URLs as fallback
+        qrCodeDataUrl: `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(asset.asset_code)}`
+      }));
+
+      await generateMultipleLabels(assetsData);
+      toast.success(`Etiquetas geradas com sucesso! (${assetsData.length} etiquetas)`);
+      setShowLabelFilterDialog(false);
+    } catch (error) {
+      console.error('Erro ao gerar etiquetas em massa:', error);
+      toast.error('Erro ao gerar etiquetas em massa');
+    } finally {
+      setIsGeneratingLabels(false);
+    }
+  };
+
 
   const filteredAssets = assets.filter(
     (asset) =>
@@ -170,6 +216,10 @@ export default function Assets() {
             <Button variant="outline" onClick={exportarAtivos} className="gap-2">
               <Download className="h-4 w-4" />
               Exportar
+            </Button>
+            <Button variant="outline" onClick={() => setShowLabelFilterDialog(true)} disabled={isGeneratingLabels} className="gap-2">
+              <Tags className="h-4 w-4" />
+              {isGeneratingLabels ? 'Gerando...' : 'Gerar Etiquetas'}
             </Button>
             <Button variant="outline" onClick={() => setShowImportDialog(true)} className="gap-2">
               <Upload className="h-4 w-4" />
@@ -677,6 +727,66 @@ export default function Assets() {
                   <>
                     <Upload className="mr-2 h-4 w-4" />
                     Importar
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showLabelFilterDialog} onOpenChange={setShowLabelFilterDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Selecionar Setor para Gerar Etiquetas</DialogTitle>
+              <DialogDescription>
+                Escolha um setor ou todos os ativos para gerar as etiquetas
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="sector-filter">Setor</Label>
+                <Select value={selectedSectorForLabels} onValueChange={setSelectedSectorForLabels}>
+                  <SelectTrigger id="sector-filter">
+                    <SelectValue placeholder="Selecione um setor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os Ativos</SelectItem>
+                    {Array.from(
+                      new Set(
+                        filteredAssets
+                          .map((a) => a.sector)
+                          .filter((s): s is string => s !== null && s !== undefined)
+                      )
+                    )
+                      .sort()
+                      .map((sector) => (
+                        <SelectItem key={sector} value={sector}>
+                          {sector}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {selectedSectorForLabels === 'all'
+                  ? `${filteredAssets.length} ativos serão incluídos`
+                  : `${filteredAssets.filter((a) => a.sector === selectedSectorForLabels).length} ativos neste setor`}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowLabelFilterDialog(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={gerarEtiquetasEmMassa} disabled={isGeneratingLabels}>
+                {isGeneratingLabels ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Gerando...
+                  </>
+                ) : (
+                  <>
+                    <Tags className="mr-2 h-4 w-4" />
+                    Gerar Etiquetas
                   </>
                 )}
               </Button>

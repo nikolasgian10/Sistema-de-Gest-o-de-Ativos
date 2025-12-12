@@ -1,8 +1,10 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { QrCode } from "lucide-react";
+import { QrCode, Tag } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
+import { generateSingleLabel } from "@/lib/label-generator";
+import { toast } from "sonner";
 
 type QRCodeModalProps = {
   open: boolean;
@@ -24,6 +26,7 @@ export default function QRCodeModal({ open, onOpenChange, title, code, subtitle 
   const [srcIndex, setSrcIndex] = useState(0);
   const currentSrc = providers[Math.min(srcIndex, providers.length - 1)];
   const [dataUrl, setDataUrl] = useState<string | null>(null);
+  const [isGeneratingLabel, setIsGeneratingLabel] = useState(false);
 
   // Try to generate QR locally (no network) using a dynamic import
   useEffect(() => {
@@ -68,6 +71,20 @@ export default function QRCodeModal({ open, onOpenChange, title, code, subtitle 
     }
   };
 
+  const handleGenerateLabel = async () => {
+    try {
+      setIsGeneratingLabel(true);
+      const qrToUse = dataUrl || currentSrc;
+      await generateSingleLabel(title || code, qrToUse);
+      toast.success('Etiqueta gerada com sucesso!');
+    } catch (error) {
+      console.error('Erro ao gerar etiqueta:', error);
+      toast.error('Erro ao gerar etiqueta');
+    } finally {
+      setIsGeneratingLabel(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[360px]">
@@ -90,7 +107,15 @@ export default function QRCodeModal({ open, onOpenChange, title, code, subtitle 
           )}
           <Input readOnly value={code} className="text-center text-xs" />
           {subtitle && <p className="text-xs text-muted-foreground text-center">{subtitle}</p>}
-          <Button onClick={handleDownload} variant="outline" className="mt-2">Baixar PNG</Button>
+          <div className="flex gap-2 w-full">
+            <Button onClick={handleDownload} variant="outline" className="flex-1">
+              Baixar PNG
+            </Button>
+            <Button onClick={handleGenerateLabel} disabled={isGeneratingLabel} className="flex-1 bg-blue-600 hover:bg-blue-700">
+              <Tag className="w-4 h-4 mr-2" />
+              Gerar Etiqueta
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

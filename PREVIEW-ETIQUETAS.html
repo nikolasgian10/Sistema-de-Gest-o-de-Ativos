@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Preview - Etiquetas Atualizadas</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background: #f0f0f0;
+            padding: 40px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 14px;
+        }
+        
+        .section {
+            margin-bottom: 60px;
+        }
+        
+        .section-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #333;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #ddd;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+        }
+        
+        /* Etiqueta */
+        .etiqueta {
+            width: 300px;
+            height: 150px;
+            background-color: #d3d3d3;
+            border: 1px solid #999999;
+            padding: 15px;
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+            font-family: Arial, sans-serif;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            position: relative;
+        }
+        
+        .etiqueta-left {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            flex: 1;
+            padding-right: 12px;
+        }
+        
+        .etiqueta-logo {
+            font-size: 18px;
+            font-weight: bold;
+            color: #003d7a;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+        
+        .etiqueta-code {
+            font-size: 15px;
+            font-weight: 700;
+            color: #000000;
+            line-height: 1.2;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .etiqueta-right {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 auto;
+        }
+        
+        .etiqueta-qr {
+            width: 84px;
+            height: 84px;
+            background: white;
+            border: 1px solid #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: #999;
+        }
+        
+        /* Comparação */
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .comparison-item h3 {
+            margin-bottom: 15px;
+            font-size: 14px;
+            color: #333;
+        }
+        
+        .old-label {
+            background-color: #ffffff;
+            border: 1px solid #ccc;
+        }
+        
+        .new-label {
+            background-color: #d3d3d3;
+            border: 1px solid #999999;
+        }
+        
+        .label-desc {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #666;
+            line-height: 1.5;
+        }
+        
+        .features {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+        
+        .features h3 {
+            margin-bottom: 15px;
+            color: #003d7a;
+        }
+        
+        .features ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .features li {
+            padding: 8px 0;
+            padding-left: 25px;
+            position: relative;
+            font-size: 14px;
+            color: #555;
+        }
+        
+        .features li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        
+        .dimension-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        
+        .dimension-table th,
+        .dimension-table td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+            font-size: 13px;
+        }
+        
+        .dimension-table th {
+            background: #f5f5f5;
+            color: #333;
+            font-weight: bold;
+        }
+        
+        .example-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+        
+        .example-label {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .example-label-title {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏷️ Atualização de Etiquetas - Sistema de Gestão de Ativos</h1>
+        <p class="subtitle">Nova formatação com fundo cinza, seleção por setor e código em linha única</p>
+        
+        <!-- Features -->
+        <div class="features">
+            <h3>✨ Principais Melhorias</h3>
+            <ul>
+                <li><strong>Fundo Cinza (#d3d3d3):</strong> Substitui o branco anterior para melhor contraste visual</li>
+                <li><strong>Layout Otimizado:</strong> Logo MAHLE e código em linha única à esquerda, QR code à direita</li>
+                <li><strong>Código em Linha Única:</strong> Evita quebra de texto com ellipsis para códigos longos</li>
+                <li><strong>Filtro por Setor:</strong> Dialog permite selecionar qual setor gerar etiquetas</li>
+                <li><strong>Bordas Melhoradas:</strong> Cor #999999 para melhor definição visual</li>
+                <li><strong>Contador Dinâmico:</strong> Mostra quantas etiquetas serão geradas</li>
+            </ul>
+        </div>
+        
+        <!-- Comparação Antes/Depois -->
+        <div class="section">
+            <div class="section-title">📊 Comparação: Antes vs Depois</div>
+            <div class="comparison">
+                <div class="comparison-item">
+                    <h3>❌ ANTES</h3>
+                    <div class="etiqueta old-label">
+                        <div class="etiqueta-left">
+                            <div class="etiqueta-logo">MAHLE</div>
+                            <div class="etiqueta-code">ATR-AR-P1</div>
+                            <div class="etiqueta-code">001</div>
+                        </div>
+                        <div class="etiqueta-right">
+                            <div class="etiqueta-qr">QR</div>
+                        </div>
+                    </div>
+                    <div class="label-desc">
+                        • Fundo branco<br>
+                        • Código dividido em 2 linhas<br>
+                        • Borda cinza clara
+                    </div>
+                </div>
+                
+                <div class="comparison-item">
+                    <h3>✅ DEPOIS</h3>
+                    <div class="etiqueta new-label">
+                        <div class="etiqueta-left">
+                            <div class="etiqueta-logo">MAHLE</div>
+                            <div class="etiqueta-code">ATR-AR-P1-001</div>
+                        </div>
+                        <div class="etiqueta-right">
+                            <div class="etiqueta-qr">QR</div>
+                        </div>
+                    </div>
+                    <div class="label-desc">
+                        • Fundo cinza (#d3d3d3)<br>
+                        • Código em linha única<br>
+                        • Borda cinza escuro
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Exemplos de Etiquetas -->
+        <div class="section">
+            <div class="section-title">📋 Exemplos de Etiquetas Geradas</div>
+            <div class="example-grid">
+                <div class="example-label">
+                    <div class="example-label-title">Ar Condicionado</div>
+                    <div class="etiqueta new-label">
+                        <div class="etiqueta-left">
+                            <div class="etiqueta-logo">MAHLE</div>
+                            <div class="etiqueta-code">AR-CONDICIONADO-P1-042</div>
+                        </div>
+                        <div class="etiqueta-right">
+                            <div class="etiqueta-qr">QR</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="example-label">
+                    <div class="example-label-title">Mecalor</div>
+                    <div class="etiqueta new-label">
+                        <div class="etiqueta-left">
+                            <div class="etiqueta-logo">MAHLE</div>
+                            <div class="etiqueta-code">MEC-SALA-P2-015</div>
+                        </div>
+                        <div class="etiqueta-right">
+                            <div class="etiqueta-qr">QR</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="example-label">
+                    <div class="example-label-title">Ar Máquina</div>
+                    <div class="etiqueta new-label">
+                        <div class="etiqueta-left">
+                            <div class="etiqueta-logo">MAHLE</div>
+                            <div class="etiqueta-code">ARM-PRODUCAO-A-033</div>
+                        </div>
+                        <div class="etiqueta-right">
+                            <div class="etiqueta-qr">QR</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Especificações Técnicas -->
+        <div class="section">
+            <div class="section-title">⚙️ Especificações Técnicas</div>
+            
+            <h3 style="margin-top: 20px; margin-bottom: 10px; font-size: 14px;">Dimensões de Cada Etiqueta</h3>
+            <table class="dimension-table">
+                <tr>
+                    <th>Propriedade</th>
+                    <th>Valor</th>
+                </tr>
+                <tr>
+                    <td>Largura</td>
+                    <td>80 mm</td>
+                </tr>
+                <tr>
+                    <td>Altura</td>
+                    <td>40 mm</td>
+                </tr>
+                <tr>
+                    <td>Orientação</td>
+                    <td>Landscape (Paisagem)</td>
+                </tr>
+                <tr>
+                    <td>Formato de Página</td>
+                    <td>A4</td>
+                </tr>
+                <tr>
+                    <td>Espaçamento Horizontal</td>
+                    <td>5 mm</td>
+                </tr>
+                <tr>
+                    <td>Espaçamento Vertical</td>
+                    <td>5 mm</td>
+                </tr>
+            </table>
+            
+            <h3 style="margin-top: 20px; margin-bottom: 10px; font-size: 14px;">Cores e Estilos</h3>
+            <table class="dimension-table">
+                <tr>
+                    <th>Elemento</th>
+                    <th>Cor/Estilo</th>
+                </tr>
+                <tr>
+                    <td>Fundo</td>
+                    <td>#d3d3d3 (Cinza)</td>
+                </tr>
+                <tr>
+                    <td>Borda</td>
+                    <td>#999999 (Cinza Escuro)</td>
+                </tr>
+                <tr>
+                    <td>Logo MAHLE</td>
+                    <td>#003d7a (Azul), 8px, Bold</td>
+                </tr>
+                <tr>
+                    <td>Código do Ativo</td>
+                    <td>#000000 (Preto), 7px, Weight 700</td>
+                </tr>
+                <tr>
+                    <td>QR Code</td>
+                    <td>28x28px com borda preta</td>
+                </tr>
+            </table>
+        </div>
+        
+        <!-- Novo Fluxo -->
+        <div class="section">
+            <div class="section-title">🎯 Como Usar o Novo Filtro por Setor</div>
+            <div style="background: white; padding: 20px; border-radius: 8px; line-height: 1.8;">
+                <ol style="list-style-position: inside; margin-left: 10px;">
+                    <li style="margin-bottom: 10px;"><strong>Clique no botão "Gerar Etiquetas"</strong> na página de Ativos</li>
+                    <li style="margin-bottom: 10px;"><strong>Dialog abre</strong> mostrando:
+                        <ul style="margin-left: 25px; margin-top: 5px;">
+                            <li>Opção "Todos os Ativos"</li>
+                            <li>Lista dinâmica de setores cadastrados</li>
+                            <li>Contador de ativos que serão incluídos</li>
+                        </ul>
+                    </li>
+                    <li style="margin-bottom: 10px;"><strong>Selecione o setor</strong> desejado (ou deixe "Todos os Ativos")</li>
+                    <li style="margin-bottom: 10px;"><strong>Clique em "Gerar Etiquetas"</strong></li>
+                    <li style="margin-bottom: 10px;"><strong>PDF é baixado</strong> com todas as etiquetas formatadas</li>
+                </ol>
+            </div>
+        </div>
+        
+        <!-- Arquivos Alterados -->
+        <div class="section">
+            <div class="section-title">📂 Arquivos Modificados</div>
+            <div style="background: white; padding: 20px; border-radius: 8px;">
+                <p style="margin-bottom: 10px;"><strong>1. src/lib/label-generator.ts</strong></p>
+                <ul style="margin-left: 20px; margin-bottom: 15px;">
+                    <li>✓ Atualizado <code>generateSingleLabel()</code> com novo design</li>
+                    <li>✓ Atualizado <code>generateMultipleLabels()</code> com fundo cinza</li>
+                    <li>✓ Código em linha única com ellipsis</li>
+                </ul>
+                
+                <p style="margin-bottom: 10px;"><strong>2. src/pages/Assets.tsx</strong></p>
+                <ul style="margin-left: 20px;">
+                    <li>✓ Adicionado estado para dialog de filtro</li>
+                    <li>✓ Adicionado estado para setor selecionado</li>
+                    <li>✓ Importado componente Select do shadcn/ui</li>
+                    <li>✓ Atualizado interface Asset com campo sector</li>
+                    <li>✓ Adicionado novo Dialog para seleção de setor</li>
+                    <li>✓ Modificada função gerarEtiquetasEmMassa()</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Status de Compilação -->
+        <div class="features" style="border-left: 4px solid #4CAF50;">
+            <h3 style="color: #4CAF50;">✅ Verificação de Compilação</h3>
+            <ul>
+                <li><strong>Status TypeScript:</strong> Sem erros</li>
+                <li><strong>Status de Build:</strong> Build produção executado com sucesso</li>
+                <li><strong>Compatibilidade:</strong> Compatível com versões anteriores</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
